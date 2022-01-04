@@ -28,7 +28,7 @@ type PathBuilder struct {
 	lastMoveTo   f32.Point
 }
 
-// MoveTo implements the 'm' operator.
+// MoveTo starts a new subpath at (x, y).
 func (p *PathBuilder) MoveTo(x, y float32) {
 	pt := f32.Point{x, y}
 	p.currentPoint = pt
@@ -42,14 +42,15 @@ func (p *PathBuilder) MoveTo(x, y float32) {
 	p.Path = append(p.Path, PathElement{Op: 'm', End: pt})
 }
 
-// LineTo implements the 'l' operator.
+// LineTo adds a line segment to the path, ending at (x, y).
 func (p *PathBuilder) LineTo(x, y float32) {
 	pt := f32.Point{x, y}
 	p.currentPoint = pt
 	p.Path = append(p.Path, PathElement{Op: 'l', End: pt})
 }
 
-// CurveTo implements the 'c' operator.
+// CurveTo adds a cubic Bezier curve to the path. It ends at (x3, y3) and has
+// (x1, y1) and (x2, y2) for control points.
 func (p *PathBuilder) CurveTo(x1, y1, x2, y2, x3, y3 float32) {
 	e := PathElement{
 		Op:  'c',
@@ -61,7 +62,8 @@ func (p *PathBuilder) CurveTo(x1, y1, x2, y2, x3, y3 float32) {
 	p.Path = append(p.Path, e)
 }
 
-// CurveV implements the 'v' operator.
+// CurveV adds a cubic Bezier curve to the path. It ends at (x3, y3) and has
+// the current point and (x2, y2) for control points.
 func (p *PathBuilder) CurveV(x2, y2, x3, y3 float32) {
 	e := PathElement{
 		Op:  'c',
@@ -73,7 +75,8 @@ func (p *PathBuilder) CurveV(x2, y2, x3, y3 float32) {
 	p.Path = append(p.Path, e)
 }
 
-// CurveY implements the 'y' operator.
+// CurveY adds a cubic Bezier curve to the path. It ends at (x3, y3) and has
+// (x1, y1) and (x3, y3) for control points.
 func (p *PathBuilder) CurveY(x1, y1, x3, y3 float32) {
 	e := PathElement{
 		Op:  'c',
@@ -85,7 +88,8 @@ func (p *PathBuilder) CurveY(x1, y1, x3, y3 float32) {
 	p.Path = append(p.Path, e)
 }
 
-// ClosePath implements the 'h' operator.
+// ClosePath closes the path, ensuring that it ends at the same point where it
+// began.
 func (p *PathBuilder) ClosePath() {
 	if len(p.Path) > 0 && p.Path[len(p.Path)-1].Op == 'h' {
 		return
@@ -94,7 +98,8 @@ func (p *PathBuilder) ClosePath() {
 	p.currentPoint = p.lastMoveTo
 }
 
-// Rectangle implements the 're' operator.
+// Rectangle creates a new subpath containing a rectangle of the specified
+// dimensions.
 func (p *PathBuilder) Rectangle(x, y, width, height float32) {
 	p.MoveTo(x, y)
 	p.LineTo(x+width, y)

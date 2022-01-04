@@ -72,33 +72,33 @@ func (c *Canvas) stroke() {
 	paint.FillShape(c.ops, c.strokeColor, s.Op(c.ops))
 }
 
-// Fill implements the 'f' operator.
+// Fill fills the current path.
 func (c *Canvas) Fill() {
 	c.fill()
 	c.Path = c.Path[:0]
 }
 
-// Stroke implements the 'S' operator.
+// Stroke strokes (outlines) the current path.
 func (c *Canvas) Stroke() {
 	c.stroke()
 	c.Path = c.Path[:0]
 }
 
-// CloseAndStroke implements the 's' operator.
+// CloseAndStroke closes the current path before stroking it it.
 func (c *Canvas) CloseAndStroke() {
 	c.ClosePath()
 	c.stroke()
 	c.Path = c.Path[:0]
 }
 
-// FillAndStroke implements the 'B' operator.
+// FillAndStroke fills the current path and then strokes (outlines) it.
 func (c *Canvas) FillAndStroke() {
 	c.fill()
 	c.stroke()
 	c.Path = c.Path[:0]
 }
 
-// CloseFillAndStroke implements the 'b' operator.
+// CloseFillAndStroke closes the current path before filling and stroking it.
 func (c *Canvas) CloseFillAndStroke() {
 	c.ClosePath()
 	c.fill()
