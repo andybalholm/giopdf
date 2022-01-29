@@ -1,11 +1,17 @@
 package giopdf
 
-import "image/color"
+import (
+	"image/color"
+
+	"gioui.org/op"
+)
 
 type graphicsState struct {
 	fillColor   color.NRGBA
 	strokeColor color.NRGBA
 	lineWidth   float32
+
+	transforms []op.TransformStack
 }
 
 func rgbColor(r, g, b float32) color.NRGBA {

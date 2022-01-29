@@ -1,6 +1,7 @@
 package giopdf
 
 import (
+	"image"
 	"image/color"
 
 	"gioui.org/f32"
@@ -15,6 +16,8 @@ import (
 type Canvas struct {
 	PathBuilder
 	graphicsState
+
+	stateStack []graphicsState
 
 	ops *op.Ops
 }
@@ -104,4 +107,42 @@ func (c *Canvas) CloseFillAndStroke() {
 	c.fill()
 	c.stroke()
 	c.Path = c.Path[:0]
+}
+
+// Save pushes a copy of the current graphics state onto the state stack.
+func (c *Canvas) Save() {
+	c.stateStack = append(c.stateStack, c.graphicsState)
+	c.transforms = nil
+}
+
+// Restore restores the graphics state, popping it off the stack.
+func (c *Canvas) Restore() {
+	// First pop off the TransformStack entries that were saved since the last Save call.
+	for i := len(c.transforms) - 1; i >= 0; i-- {
+		c.transforms[i].Pop()
+	}
+
+	n := len(c.stateStack) - 1
+	c.graphicsState = c.stateStack[n]
+	c.stateStack = c.stateStack[:n]
+}
+
+// Transform changes the coordinate system according to the transformation
+// matrix specified.
+func (ca *Canvas) Transform(a, b, c, d, e, f float32) {
+	m := f32.NewAffine2D(a, c, e, b, d, f)
+	s := op.Affine(m).Push(ca.ops)
+	ca.transforms = append(ca.transforms, s)
+}
+
+// Image draws an image. The image is placed in the unit square of the user
+// coordinate system.
+func (c *Canvas) Image(img image.Image) {
+	io := paint.NewImageOp(img)
+	size := io.Size()
+	c.Save()
+	c.Transform(1/float32(size.X), 0, 0, -1/float32(size.Y), 0, 1)
+	io.Add(c.ops)
+	paint.PaintOp{}.Add(c.ops)
+	c.Restore()
 }

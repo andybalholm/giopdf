@@ -3,10 +3,11 @@ module github.com/andybalholm/giopdf
 go 1.17
 
 replace gioui.org/x => /home/andy/src/gioui.org/x
+
 replace gioui.org => /home/andy/src/gioui.org
 
 require (
-	gioui.org v0.0.0-20211230092323-cce0a121e1b8
+	gioui.org v0.0.0-20220105104929-8d8aeef66bef
 	github.com/ledongthuc/pdf v0.0.0-20210621053716-e28cb8259002
 )
 

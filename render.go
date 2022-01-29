@@ -13,11 +13,15 @@ import (
 // starts in the lower left, not in the upper left like Gio's.)
 func RenderPage(ops *op.Ops, page pdf.Page) {
 	r := newRenderer(ops)
+	r.resources = page.Resources()
+
 	pdf.Interpret(page.V.Key("Contents"), r.do)
 }
 
 type renderer struct {
 	*Canvas
+
+	resources pdf.Value
 }
 
 func newRenderer(ops *op.Ops) *renderer {
@@ -51,6 +55,15 @@ func (r *renderer) do(stk *pdf.Stack, op string) {
 		x1 := float32(stk.Pop().Float64())
 		r.CurveTo(x1, y1, x2, y2, x3, y3)
 
+	case "cm":
+		f := float32(stk.Pop().Float64())
+		e := float32(stk.Pop().Float64())
+		d := float32(stk.Pop().Float64())
+		c := float32(stk.Pop().Float64())
+		b := float32(stk.Pop().Float64())
+		a := float32(stk.Pop().Float64())
+		r.Transform(a, b, c, d, e, f)
+
 	case "f", "F":
 		r.Fill()
 
@@ -66,6 +79,12 @@ func (r *renderer) do(stk *pdf.Stack, op string) {
 		case "m":
 			r.MoveTo(x, y)
 		}
+
+	case "q":
+		r.Save()
+
+	case "Q":
+		r.Restore()
 
 	case "RG", "rg":
 		B := float32(stk.Pop().Float64())
