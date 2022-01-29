@@ -4,24 +4,38 @@ import (
 	"fmt"
 
 	"gioui.org/op"
-	"github.com/ledongthuc/pdf"
+	"github.com/benoitkugler/pdf/contentstream"
+	"github.com/benoitkugler/pdf/model"
+	"github.com/benoitkugler/pdf/reader/parser"
 )
 
 // RenderPage draws the contents of a PDF page to ops.
 // The caller should do the appropriate transformation and scaling to ensure
 // that the content is not rendered upside down. (The PDF coordinate system
 // starts in the lower left, not in the upper left like Gio's.)
-func RenderPage(ops *op.Ops, page pdf.Page) {
+func RenderPage(ops *op.Ops, page *model.PageObject) error {
 	r := newRenderer(ops)
-	r.resources = page.Resources()
+	r.resources = page.Resources
 
-	pdf.Interpret(page.V.Key("Contents"), r.do)
+	for _, stream := range page.Contents {
+		decoded, err := stream.Decode()
+		if err != nil {
+			return err
+		}
+		operations, err := parser.ParseContent(decoded, page.Resources.ColorSpace)
+		if err != nil {
+			return err
+		}
+		r.do(operations)
+	}
+
+	return nil
 }
 
 type renderer struct {
 	*Canvas
 
-	resources pdf.Value
+	resources *model.ResourcesDict
 }
 
 func newRenderer(ops *op.Ops) *renderer {
@@ -30,80 +44,31 @@ func newRenderer(ops *op.Ops) *renderer {
 	}
 }
 
-func (r *renderer) do(stk *pdf.Stack, op string) {
-	switch op {
-	default:
-		n := stk.Len()
-		args := make([]pdf.Value, n)
-		for i := n - 1; i >= 0; i-- {
-			args[i] = stk.Pop()
+func (r *renderer) do(operations []contentstream.Operation) {
+	for _, op := range operations {
+		switch op := op.(type) {
+		case contentstream.OpConcat:
+			m := op.Matrix
+			r.Transform(m[0], m[1], m[2], m[3], m[4], m[5])
+		case contentstream.OpRestore:
+			r.Restore()
+		case contentstream.OpSave:
+			r.Save()
+		case contentstream.OpXObject:
+			x := r.resources.XObject[op.XObject]
+			switch x := x.(type) {
+			case *model.XObjectImage:
+				img, err := decodeImage(x)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+				r.Image(img)
+			default:
+				fmt.Printf("XObject (%T): %v\n", x, x)
+			}
+		default:
+			fmt.Printf("%T: %v\n", op, op)
 		}
-		fmt.Println(op, args)
-
-	case "B":
-		r.FillAndStroke()
-
-	case "b":
-		r.CloseFillAndStroke()
-
-	case "c":
-		y3 := float32(stk.Pop().Float64())
-		x3 := float32(stk.Pop().Float64())
-		y2 := float32(stk.Pop().Float64())
-		x2 := float32(stk.Pop().Float64())
-		y1 := float32(stk.Pop().Float64())
-		x1 := float32(stk.Pop().Float64())
-		r.CurveTo(x1, y1, x2, y2, x3, y3)
-
-	case "cm":
-		f := float32(stk.Pop().Float64())
-		e := float32(stk.Pop().Float64())
-		d := float32(stk.Pop().Float64())
-		c := float32(stk.Pop().Float64())
-		b := float32(stk.Pop().Float64())
-		a := float32(stk.Pop().Float64())
-		r.Transform(a, b, c, d, e, f)
-
-	case "f", "F":
-		r.Fill()
-
-	case "h":
-		r.ClosePath()
-
-	case "l", "m":
-		y := float32(stk.Pop().Float64())
-		x := float32(stk.Pop().Float64())
-		switch op {
-		case "l":
-			r.LineTo(x, y)
-		case "m":
-			r.MoveTo(x, y)
-		}
-
-	case "q":
-		r.Save()
-
-	case "Q":
-		r.Restore()
-
-	case "RG", "rg":
-		B := float32(stk.Pop().Float64())
-		G := float32(stk.Pop().Float64())
-		R := float32(stk.Pop().Float64())
-		switch op {
-		case "RG":
-			r.SetRGBStrokeColor(R, G, B)
-		case "rg":
-			r.SetRGBFillColor(R, G, B)
-		}
-
-	case "S":
-		r.Stroke()
-
-	case "s":
-		r.CloseAndStroke()
-
-	case "w":
-		r.SetLineWidth(float32(stk.Pop().Float64()))
 	}
 }
