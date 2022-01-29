@@ -68,6 +68,10 @@ func (r *renderer) do(operations []contentstream.Operation) {
 			r.SetFillGray(op.G)
 		case contentstream.OpSetFillRGBColor:
 			r.SetRGBFillColor(op.R, op.G, op.B)
+		case contentstream.OpSetLineCap:
+			r.SetLineCap(int(op.Style))
+		case contentstream.OpSetLineJoin:
+			r.SetLineJoin(int(op.Style))
 		case contentstream.OpSetLineWidth:
 			r.SetLineWidth(op.W)
 		case contentstream.OpSetStrokeGray:

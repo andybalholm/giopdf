@@ -10,6 +10,9 @@ type graphicsState struct {
 	fillColor   color.NRGBA
 	strokeColor color.NRGBA
 	lineWidth   float32
+	lineCap     int
+	lineJoin    int
+	miterLimit  float32
 
 	transforms []op.TransformStack
 }
@@ -60,4 +63,21 @@ func (s *graphicsState) SetStrokeGray(g float32) {
 // shapes.
 func (s *graphicsState) SetLineWidth(w float32) {
 	s.lineWidth = w
+}
+
+// SetLineCap sets the style for the caps at the end of lines:
+// 0 (butt cap), 1 (round cap), or 2 (square cap).
+func (s *graphicsState) SetLineCap(c int) {
+	s.lineCap = c
+}
+
+// SetLineJoin sets the style for the joins at corners of stroked paths:
+// 0 (miter join), 1 (round join), or 2 (bevel join).
+func (s *graphicsState) SetLineJoin(j int) {
+	s.lineJoin = j
+}
+
+// SetMiterLimit sets the limit for the length of a mitered join.
+func (s *graphicsState) SetMiterLimit(m float32) {
+	s.miterLimit = m
 }

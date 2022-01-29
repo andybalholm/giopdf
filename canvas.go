@@ -70,7 +70,26 @@ func (c *Canvas) stroke() {
 		Miter: 10,
 	}
 
-	// TODO: support dashes, joins, and caps
+	switch c.lineCap {
+	case 1:
+		s.Cap = stroke.RoundCap
+	case 2:
+		s.Cap = stroke.SquareCap
+	}
+
+	switch c.lineJoin {
+	case 0:
+		s.Join = stroke.BevelJoin
+		s.Miter = c.miterLimit
+	case 1:
+		s.Join = stroke.RoundJoin
+		s.Miter = 0
+	case 2:
+		s.Join = stroke.BevelJoin
+		s.Miter = 0
+	}
+
+	// TODO: support dashes
 
 	paint.FillShape(c.ops, c.strokeColor, s.Op(c.ops))
 }
