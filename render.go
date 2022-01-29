@@ -47,13 +47,35 @@ func newRenderer(ops *op.Ops) *renderer {
 func (r *renderer) do(operations []contentstream.Operation) {
 	for _, op := range operations {
 		switch op := op.(type) {
+		case contentstream.OpClosePath:
+			r.ClosePath()
 		case contentstream.OpConcat:
 			m := op.Matrix
 			r.Transform(m[0], m[1], m[2], m[3], m[4], m[5])
+		case contentstream.OpCubicTo:
+			r.CurveTo(op.X1, op.Y1, op.X2, op.Y2, op.X3, op.Y3)
+		case contentstream.OpFill, contentstream.OpEOFill:
+			r.Fill()
+		case contentstream.OpLineTo:
+			r.LineTo(op.X, op.Y)
+		case contentstream.OpMoveTo:
+			r.MoveTo(op.X, op.Y)
 		case contentstream.OpRestore:
 			r.Restore()
 		case contentstream.OpSave:
 			r.Save()
+		case contentstream.OpSetFillGray:
+			r.SetFillGray(op.G)
+		case contentstream.OpSetFillRGBColor:
+			r.SetRGBFillColor(op.R, op.G, op.B)
+		case contentstream.OpSetLineWidth:
+			r.SetLineWidth(op.W)
+		case contentstream.OpSetStrokeGray:
+			r.SetStrokeGray(op.G)
+		case contentstream.OpSetStrokeRGBColor:
+			r.SetRGBStrokeColor(op.R, op.G, op.B)
+		case contentstream.OpStroke:
+			r.Stroke()
 		case contentstream.OpXObject:
 			x := r.resources.XObject[op.XObject]
 			switch x := x.(type) {
