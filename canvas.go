@@ -29,6 +29,7 @@ func NewCanvas(ops *op.Ops) *Canvas {
 			fillColor:   color.NRGBA{0, 0, 0, 255},
 			strokeColor: color.NRGBA{0, 0, 0, 255},
 			lineWidth:   1,
+			miterLimit:  10,
 		},
 	}
 }
@@ -68,6 +69,11 @@ func (c *Canvas) stroke() {
 		Cap:   stroke.FlatCap,
 		Join:  stroke.BevelJoin,
 		Miter: 10,
+
+		Dashes: stroke.Dashes{
+			Dashes: c.dashes,
+			Phase:  c.dashPhase,
+		},
 	}
 
 	switch c.lineCap {
@@ -88,8 +94,6 @@ func (c *Canvas) stroke() {
 		s.Join = stroke.BevelJoin
 		s.Miter = 0
 	}
-
-	// TODO: support dashes
 
 	paint.FillShape(c.ops, c.strokeColor, s.Op(c.ops))
 }

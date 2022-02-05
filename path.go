@@ -88,6 +88,17 @@ func (p *PathBuilder) CurveY(x1, y1, x3, y3 float32) {
 	p.Path = append(p.Path, e)
 }
 
+// QuadraticCurveTo adds a quadratic Bezier curve to the path. It ends at
+// (x2, y2) and has (x1, y1) for its control point.
+func (p *PathBuilder) QuadraticCurveTo(x1, y1, x2, y2 float32) {
+	// Convert the quadratic curve to a cubic one.
+	c1x := p.currentPoint.X + (x1-p.currentPoint.X)*2/3
+	c1y := p.currentPoint.Y + (y1-p.currentPoint.Y)*2/3
+	c2x := x2 + (x1-x2)*2/3
+	c2y := y2 + (y1-y2)*2/3
+	p.CurveTo(c1x, c1y, c2x, c2y, x2, y2)
+}
+
 // ClosePath closes the path, ensuring that it ends at the same point where it
 // began.
 func (p *PathBuilder) ClosePath() {
