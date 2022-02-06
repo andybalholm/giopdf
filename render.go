@@ -47,6 +47,8 @@ func newRenderer(ops *op.Ops) *renderer {
 func (r *renderer) do(operations []contentstream.Operation) {
 	for _, op := range operations {
 		switch op := op.(type) {
+		case contentstream.OpBeginText:
+			r.BeginText()
 		case contentstream.OpClosePath:
 			r.ClosePath()
 		case contentstream.OpConcat:
@@ -56,6 +58,8 @@ func (r *renderer) do(operations []contentstream.Operation) {
 			r.CurveTo(op.X1, op.Y1, op.X2, op.Y2, op.X3, op.Y3)
 		case contentstream.OpCurveTo1:
 			r.CurveV(op.X2, op.Y2, op.X3, op.Y3)
+		case contentstream.OpEndText:
+			r.EndText()
 		case contentstream.OpFill, contentstream.OpEOFill:
 			r.Fill()
 		case contentstream.OpFillStroke, contentstream.OpEOFillStroke:
@@ -72,6 +76,10 @@ func (r *renderer) do(operations []contentstream.Operation) {
 			r.SetDash(op.Dash.Array, op.Dash.Phase)
 		case contentstream.OpSetExtGState:
 			gs := r.resources.ExtGState[op.Dict]
+			if gs == nil {
+				fmt.Printf("ExtGState resource missing: %v", op.Dict)
+				continue
+			}
 			if gs.LW != 0 {
 				r.SetLineWidth(gs.LW)
 			}
@@ -97,6 +105,18 @@ func (r *renderer) do(operations []contentstream.Operation) {
 			r.SetFillGray(op.G)
 		case contentstream.OpSetFillRGBColor:
 			r.SetRGBFillColor(op.R, op.G, op.B)
+		case contentstream.OpSetFont:
+			fd := r.resources.Font[op.Font]
+			if fd == nil {
+				fmt.Printf("Font resource missing: $v", op.Font)
+				continue
+			}
+			f, err := importPDFFont(fd.Subtype)
+			if err != nil {
+				fmt.Println("Error importing font:", err)
+				continue
+			}
+			r.SetFont(f, op.Size)
 		case contentstream.OpSetLineCap:
 			r.SetLineCap(int(op.Style))
 		case contentstream.OpSetLineJoin:
@@ -107,8 +127,12 @@ func (r *renderer) do(operations []contentstream.Operation) {
 			r.SetStrokeGray(op.G)
 		case contentstream.OpSetStrokeRGBColor:
 			r.SetRGBStrokeColor(op.R, op.G, op.B)
+		case contentstream.OpShowText:
+			r.ShowText(op.Text)
 		case contentstream.OpStroke:
 			r.Stroke()
+		case contentstream.OpTextMove:
+			r.TextMove(op.X, op.Y)
 		case contentstream.OpXObject:
 			x := r.resources.XObject[op.XObject]
 			switch x := x.(type) {

@@ -102,7 +102,7 @@ func (p *PathBuilder) QuadraticCurveTo(x1, y1, x2, y2 float32) {
 // ClosePath closes the path, ensuring that it ends at the same point where it
 // began.
 func (p *PathBuilder) ClosePath() {
-	if len(p.Path) > 0 && p.Path[len(p.Path)-1].Op == 'h' {
+	if len(p.Path) == 0 || p.Path[len(p.Path)-1].Op == 'h' {
 		return
 	}
 	p.Path = append(p.Path, PathElement{Op: 'h'})
@@ -152,4 +152,17 @@ func toPathSpec(ops *op.Ops, p []PathElement, alwaysClose bool) clip.PathSpec {
 	}
 
 	return path.End()
+}
+
+func transformPath(p []PathElement, matrix f32.Affine2D) []PathElement {
+	result := make([]PathElement, len(p))
+	for i, e := range p {
+		result[i] = PathElement{
+			Op:  e.Op,
+			CP1: matrix.Transform(e.CP1),
+			CP2: matrix.Transform(e.CP2),
+			End: matrix.Transform(e.End),
+		}
+	}
+	return result
 }

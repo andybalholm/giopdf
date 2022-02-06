@@ -3,6 +3,7 @@ package giopdf
 import (
 	"image/color"
 
+	"gioui.org/f32"
 	"gioui.org/op"
 )
 
@@ -17,6 +18,11 @@ type graphicsState struct {
 
 	dashes    []float32
 	dashPhase float32
+
+	font       Font
+	fontSize   float32
+	textMatrix f32.Affine2D
+	lineMatrix f32.Affine2D
 
 	transforms []op.TransformStack
 }
@@ -100,4 +106,23 @@ func (s *graphicsState) SetStrokeAlpha(alpha float32) {
 // SetFillAlpha sets the opacity for filling paths.
 func (s *graphicsState) SetFillAlpha(alpha float32) {
 	s.fillColor.A = uint8(alpha * 255)
+}
+
+// SetFont sets the font and size for text.
+func (s *graphicsState) SetFont(f Font, size float32) {
+	s.font = f
+	s.fontSize = size
+}
+
+// SetTextMatrix sets the text matrix and the text line matrix.
+func (s *graphicsState) SetTextMatrix(a, b, c, d, e, f float32) {
+	s.lineMatrix = f32.NewAffine2D(a, c, e, b, d, f)
+	s.textMatrix = s.lineMatrix
+}
+
+// TextMove starts a new line of text offset by x and y from the start of the
+// current line.
+func (s *graphicsState) TextMove(x, y float32) {
+	s.lineMatrix = f32.NewAffine2D(1, 0, x, 0, 1, y).Mul(s.lineMatrix)
+	s.textMatrix = s.lineMatrix
 }
