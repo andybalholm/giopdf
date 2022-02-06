@@ -95,6 +95,16 @@ func (s *graphicsState) SetMiterLimit(m float32) {
 // SetDash sets the dash pattern for stroking paths.
 func (s *graphicsState) SetDash(lengths []float32, phase float32) {
 	s.dashes = lengths
+	if phase < 0 {
+		// Adjust the phase to make it positive.
+		totalLength := float32(0)
+		for _, d := range lengths {
+			totalLength += d
+		}
+		for phase < 0 && totalLength > 0 {
+			phase += totalLength
+		}
+	}
 	s.dashPhase = phase
 }
 
