@@ -141,6 +141,8 @@ func RenderPage(ops *op.Ops, page pdf.Page) error {
 			c.SetFont(f, args[1].Float32())
 		case "Tj":
 			c.ShowText(args[0].RawString())
+		case "Tz":
+			c.SetHScale(args[0].Float32())
 		case "v":
 			c.CurveV(args[0].Float32(), args[1].Float32(), args[2].Float32(), args[3].Float32())
 		case "w":

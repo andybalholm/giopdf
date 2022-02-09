@@ -21,6 +21,7 @@ type graphicsState struct {
 
 	font       Font
 	fontSize   float32
+	hScale     float32
 	textMatrix f32.Affine2D
 	lineMatrix f32.Affine2D
 
@@ -135,4 +136,9 @@ func (s *graphicsState) SetTextMatrix(a, b, c, d, e, f float32) {
 func (s *graphicsState) TextMove(x, y float32) {
 	s.lineMatrix = f32.NewAffine2D(1, 0, x, 0, 1, y).Mul(s.lineMatrix)
 	s.textMatrix = s.lineMatrix
+}
+
+// SetHScale sets the horizontal scaling percent for text.
+func (s *graphicsState) SetHScale(scale float32) {
+	s.hScale = scale
 }

@@ -18,11 +18,13 @@ func (c *Canvas) EndText() {
 // ShowText displays a string of text.
 func (c *Canvas) ShowText(s string) {
 	glyphs := c.font.ToGlyphs(s)
-	sizeMatrix := f32.NewAffine2D(c.fontSize, 0, 0, 0, c.fontSize, 0)
+	vSize := c.fontSize
+	hSize := c.fontSize * c.hScale / 100
+	sizeMatrix := f32.NewAffine2D(hSize, 0, 0, 0, vSize, 0)
 	for _, g := range glyphs {
 		glyphSpace := c.textMatrix.Mul(sizeMatrix)
 		c.Path = append(c.Path, transformPath(g.Outlines, glyphSpace)...)
-		c.textMatrix = c.textMatrix.Offset(f32.Pt(g.Width*c.fontSize, 0))
+		c.textMatrix = c.textMatrix.Offset(f32.Pt(g.Width*hSize, 0))
 	}
 	c.Fill()
 }

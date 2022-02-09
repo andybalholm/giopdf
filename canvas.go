@@ -30,6 +30,7 @@ func NewCanvas(ops *op.Ops) *Canvas {
 			strokeColor: color.NRGBA{0, 0, 0, 255},
 			lineWidth:   1,
 			miterLimit:  10,
+			hScale:      100,
 		},
 	}
 }
