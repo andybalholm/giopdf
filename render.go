@@ -146,22 +146,23 @@ func (r *renderer) do(operations []contentstream.Operation) {
 			r.Stroke()
 		case contentstream.OpTextMove:
 			r.TextMove(op.X, op.Y)
-
-			/* TODO:
-			case contentstream.OpXObject:
-				x := r.resources.XObject[op.XObject]
-				switch x := x.(type) {
-				case *model.XObjectImage:
-					img, err := decodeImage(x)
-					if err != nil {
-						fmt.Println(err)
-						continue
-					}
-					r.Image(img)
-				default:
-					fmt.Printf("XObject (%T): %v\n", x, x)
+		case contentstream.OpXObject:
+			x := r.page.Resources().Key("XObject").Key(string(op.XObject))
+			if x.IsNull() {
+				fmt.Printf("XObject resource missing: %v", op.XObject)
+				continue
+			}
+			switch x.Key("Subtype").Name() {
+			case "Image":
+				img, err := decodeImage(x)
+				if err != nil {
+					fmt.Println(err)
+					continue
 				}
-			*/
+				r.Image(img)
+			default:
+				fmt.Printf("Unsupported XObject: %v\n", x)
+			}
 		default:
 			fmt.Printf("%T: %v\n", op, op)
 		}

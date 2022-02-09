@@ -73,6 +73,8 @@ import (
 	"os"
 	"sort"
 	"strconv"
+
+	"golang.org/x/image/ccitt"
 )
 
 // A Reader is a single PDF file open for reading.
@@ -124,7 +126,7 @@ func NewReader(f io.ReaderAt, size int64) (*Reader, error) {
 func NewReaderEncrypted(f io.ReaderAt, size int64, pw func() string) (*Reader, error) {
 	buf := make([]byte, 10)
 	f.ReadAt(buf, 0)
-	if !bytes.HasPrefix(buf, []byte("%PDF-1.")) || buf[7] < '0' || buf[7] > '7' || buf[8] != '\r' && buf[8] != '\n' {
+	if !bytes.HasPrefix(buf, []byte("%PDF-1.")) || buf[7] < '0' || buf[7] > '7' || buf[8] != '\r' && buf[8] != '\n' && buf[8] != ' ' {
 		return nil, fmt.Errorf("not a PDF file: invalid header")
 	}
 	end := size
@@ -863,6 +865,22 @@ func applyFilter(rd io.Reader, name string, param Value) io.Reader {
 		case 12:
 			return &pngUpReader{r: zr, hist: make([]byte, 1+columns), tmp: make([]byte, 1+columns)}
 		}
+
+	case "CCITTFaxDecode":
+		sf := ccitt.Group3
+		if param.Key("K").Int() < 0 {
+			sf = ccitt.Group4
+		}
+		width := 1728
+		if cols := param.Key("Columns"); !cols.IsNull() {
+			width = cols.Int()
+		}
+		height := ccitt.AutoDetectHeight
+		if rows := param.Key("Rows").Int(); rows != 0 {
+			height = rows
+		}
+		invert := param.Key("BlackIs1").Bool()
+		return ccitt.NewReader(rd, ccitt.MSB, sf, width, height, &ccitt.Options{Invert: invert})
 	}
 }
 

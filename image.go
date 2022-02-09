@@ -4,39 +4,40 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 
-	"github.com/benoitkugler/pdf/model"
+	"github.com/andybalholm/giopdf/pdf"
 )
 
-func decodeImage(img *model.XObjectImage) (image.Image, error) {
-	data, err := img.Stream.Decode()
+func decodeImage(img pdf.Value) (image.Image, error) {
+	data, err := io.ReadAll(img.Reader())
 	if err != nil {
 		return nil, err
 	}
+	cs := img.Key("ColorSpace").Name()
+	bits := img.Key("BitsPerComponent").Int()
 	switch {
-	case img.ColorSpace == model.ColorSpaceName("DeviceGray") && img.BitsPerComponent == 1:
+	case cs == "DeviceGray" && bits == 1:
 		result := &bitmapImage{
-			Width:      img.Width,
-			Height:     img.Height,
+			Width:      img.Key("Width").Int(),
+			Height:     img.Key("Height").Int(),
 			Data:       data,
 			Foreground: color.White,
 			Background: color.Black,
 		}
-		if len(img.Decode) > 0 {
-			switch img.Decode[0] {
-			case [2]float32{0, 1}:
-				// Default; leave values unchanged.
-			case [2]float32{1, 0}:
-				result.Background = color.White
-				result.Foreground = color.Black
-			default:
-				return nil, fmt.Errorf("unsupported Decode array: %v", img.Decode)
-			}
+		switch img.Key("Decode").String() {
+		case "[0, 1]", "<nil>":
+			// Default; leave values unchanged.
+		case "[1, 0]":
+			result.Background = color.White
+			result.Foreground = color.Black
+		default:
+			return nil, fmt.Errorf("unsupported Decode array: %v", img.Key("Decode"))
 		}
 		return result, nil
 	}
 
-	return nil, fmt.Errorf("unsupported image (ColorSpace: %s, BitsPerComponent: %d)", img.ColorSpace, img.BitsPerComponent)
+	return nil, fmt.Errorf("unsupported image (ColorSpace: %v, BitsPerComponent: %d)", img.Key("ColorSpace"), bits)
 }
 
 type bitmapImage struct {
