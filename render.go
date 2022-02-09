@@ -2,12 +2,9 @@ package giopdf
 
 import (
 	"fmt"
-	"io"
 
 	"gioui.org/op"
 	"github.com/andybalholm/giopdf/pdf"
-	"github.com/benoitkugler/pdf/contentstream"
-	"github.com/benoitkugler/pdf/reader/parser"
 )
 
 // RenderPage draws the contents of a PDF page to ops.
@@ -15,141 +12,39 @@ import (
 // that the content is not rendered upside down. (The PDF coordinate system
 // starts in the lower left, not in the upper left like Gio's.)
 func RenderPage(ops *op.Ops, page pdf.Page) error {
-	r := newRenderer(ops)
-	r.page = page
+	c := NewCanvas(ops)
 
 	stream := page.V.Key("Contents")
+	cs := pdf.NewContentStream(stream.Reader())
 
-	decoded, err := io.ReadAll(stream.Reader())
-	if err != nil {
-		return err
-	}
-	operations, err := parser.ParseContent(decoded, nil)
-	if err != nil {
-		return err
-	}
-	r.do(operations)
+	for {
+		args, op := cs.ReadInstruction()
+		switch op {
+		case "":
+			return nil
+		default:
+			fmt.Println(args, op)
 
-	return nil
-}
-
-type renderer struct {
-	*Canvas
-
-	page pdf.Page
-}
-
-func newRenderer(ops *op.Ops) *renderer {
-	return &renderer{
-		Canvas: NewCanvas(ops),
-	}
-}
-
-func (r *renderer) do(operations []contentstream.Operation) {
-	for _, op := range operations {
-		switch op := op.(type) {
-		case contentstream.OpBeginText:
-			r.BeginText()
-		case contentstream.OpClosePath:
-			r.ClosePath()
-		case contentstream.OpConcat:
-			m := op.Matrix
-			r.Transform(m[0], m[1], m[2], m[3], m[4], m[5])
-		case contentstream.OpCubicTo:
-			r.CurveTo(op.X1, op.Y1, op.X2, op.Y2, op.X3, op.Y3)
-		case contentstream.OpCurveTo1:
-			r.CurveV(op.X2, op.Y2, op.X3, op.Y3)
-		case contentstream.OpEndText:
-			r.EndText()
-		case contentstream.OpFill, contentstream.OpEOFill:
-			r.Fill()
-		case contentstream.OpFillStroke, contentstream.OpEOFillStroke:
-			r.FillAndStroke()
-		case contentstream.OpLineTo:
-			r.LineTo(op.X, op.Y)
-		case contentstream.OpMoveTo:
-			r.MoveTo(op.X, op.Y)
-		case contentstream.OpRestore:
-			r.Restore()
-		case contentstream.OpSave:
-			r.Save()
-		case contentstream.OpSetDash:
-			r.SetDash(op.Dash.Array, op.Dash.Phase)
-		case contentstream.OpSetExtGState:
-			gs := r.page.Resources().Key("ExtGState").Key(string(op.Dict))
-			if gs.IsNull() {
-				fmt.Printf("ExtGState resource missing: %v", op.Dict)
-				continue
+		case "B", "B*":
+			c.FillAndStroke()
+		case "BT":
+			c.BeginText()
+		case "c":
+			c.CurveTo(args[0].Float32(), args[1].Float32(), args[2].Float32(), args[3].Float32(), args[4].Float32(), args[5].Float32())
+		case "cm":
+			c.Transform(args[0].Float32(), args[1].Float32(), args[2].Float32(), args[3].Float32(), args[4].Float32(), args[5].Float32())
+		case "d":
+			array := args[0]
+			phase := args[1].Float32()
+			dashes := make([]float32, array.Len())
+			for i := range dashes {
+				dashes[i] = array.Index(i).Float32()
 			}
-			for _, k := range gs.Keys() {
-				v := gs.Key(k)
-				switch k {
-				case "Type":
-					// ignore
-				case "LW":
-					r.SetLineWidth(v.Float32())
-				case "LC":
-					r.SetLineCap(v.Int())
-				case "LJ":
-					r.SetLineJoin(v.Int())
-				case "ML":
-					r.SetMiterLimit(v.Float32())
-				case "D":
-					array := v.Index(0)
-					phase := v.Index(1).Float32()
-					dashes := make([]float32, array.Len())
-					for i := range dashes {
-						dashes[i] = array.Index(i).Float32()
-					}
-					r.SetDash(dashes, phase)
-				case "CA":
-					r.SetStrokeAlpha(v.Float32())
-				case "ca":
-					r.SetFillAlpha(v.Float32())
-				case "BM":
-					if v.Name() != "Normal" {
-						fmt.Printf("Unsupported blend mode: %v\n", v)
-					}
-				default:
-					fmt.Printf("Unsupported graphics state parameter %v = %v\n", k, v)
-				}
-			}
-		case contentstream.OpSetFillGray:
-			r.SetFillGray(op.G)
-		case contentstream.OpSetFillRGBColor:
-			r.SetRGBFillColor(op.R, op.G, op.B)
-		case contentstream.OpSetFont:
-			fd := r.page.Font(string(op.Font))
-			if fd.V.IsNull() {
-				fmt.Printf("Font resource missing: $v", op.Font)
-				continue
-			}
-			f, err := importPDFFont(fd)
-			if err != nil {
-				fmt.Println("Error importing font:", err)
-				continue
-			}
-			r.SetFont(f, op.Size)
-		case contentstream.OpSetLineCap:
-			r.SetLineCap(int(op.Style))
-		case contentstream.OpSetLineJoin:
-			r.SetLineJoin(int(op.Style))
-		case contentstream.OpSetLineWidth:
-			r.SetLineWidth(op.W)
-		case contentstream.OpSetStrokeGray:
-			r.SetStrokeGray(op.G)
-		case contentstream.OpSetStrokeRGBColor:
-			r.SetRGBStrokeColor(op.R, op.G, op.B)
-		case contentstream.OpShowText:
-			r.ShowText(op.Text)
-		case contentstream.OpStroke:
-			r.Stroke()
-		case contentstream.OpTextMove:
-			r.TextMove(op.X, op.Y)
-		case contentstream.OpXObject:
-			x := r.page.Resources().Key("XObject").Key(string(op.XObject))
+			c.SetDash(dashes, phase)
+		case "Do":
+			x := page.Resources().Key("XObject").Key(args[0].Name())
 			if x.IsNull() {
-				fmt.Printf("XObject resource missing: %v", op.XObject)
+				fmt.Printf("XObject resource missing: %v", args[0])
 				continue
 			}
 			switch x.Key("Subtype").Name() {
@@ -159,12 +54,99 @@ func (r *renderer) do(operations []contentstream.Operation) {
 					fmt.Println(err)
 					continue
 				}
-				r.Image(img)
+				c.Image(img)
 			default:
 				fmt.Printf("Unsupported XObject: %v\n", x)
 			}
-		default:
-			fmt.Printf("%T: %v\n", op, op)
+		case "ET":
+			c.EndText()
+		case "f", "f*":
+			c.Fill()
+		case "G":
+			c.SetStrokeGray(args[0].Float32())
+		case "g":
+			c.SetFillGray(args[0].Float32())
+		case "gs":
+			gs := page.Resources().Key("ExtGState").Key(args[0].Name())
+			if gs.IsNull() {
+				fmt.Printf("ExtGState resource missing: %v", args[0])
+				continue
+			}
+			for _, k := range gs.Keys() {
+				v := gs.Key(k)
+				switch k {
+				case "Type":
+					// ignore
+				case "LW":
+					c.SetLineWidth(v.Float32())
+				case "LC":
+					c.SetLineCap(v.Int())
+				case "LJ":
+					c.SetLineJoin(v.Int())
+				case "ML":
+					c.SetMiterLimit(v.Float32())
+				case "D":
+					array := v.Index(0)
+					phase := v.Index(1).Float32()
+					dashes := make([]float32, array.Len())
+					for i := range dashes {
+						dashes[i] = array.Index(i).Float32()
+					}
+					c.SetDash(dashes, phase)
+				case "CA":
+					c.SetStrokeAlpha(v.Float32())
+				case "ca":
+					c.SetFillAlpha(v.Float32())
+				case "BM":
+					if v.Name() != "Normal" {
+						fmt.Printf("Unsupported blend mode: %v\n", v)
+					}
+				default:
+					fmt.Printf("Unsupported graphics state parameter %v = %v\n", k, v)
+				}
+			}
+		case "h":
+			c.ClosePath()
+		case "J":
+			c.SetLineCap(args[0].Int())
+		case "j":
+			c.SetLineJoin(args[0].Int())
+		case "l":
+			c.LineTo(args[0].Float32(), args[1].Float32())
+		case "m":
+			c.MoveTo(args[0].Float32(), args[1].Float32())
+		case "Q":
+			c.Restore()
+		case "q":
+			c.Save()
+		case "RG":
+			c.SetRGBStrokeColor(args[0].Float32(), args[1].Float32(), args[2].Float32())
+		case "rg":
+			c.SetRGBFillColor(args[0].Float32(), args[1].Float32(), args[2].Float32())
+		case "S":
+			c.Stroke()
+		case "Td":
+			c.TextMove(args[0].Float32(), args[1].Float32())
+		case "Tf":
+			fd := page.Font(args[0].Name())
+			if fd.V.IsNull() {
+				fmt.Printf("Font resource missing: $v", args[0])
+				continue
+			}
+			f, err := importPDFFont(fd)
+			if err != nil {
+				fmt.Println("Error importing font:", err)
+				continue
+			}
+			c.SetFont(f, args[1].Float32())
+		case "Tj":
+			c.ShowText(args[0].RawString())
+		case "v":
+			c.CurveV(args[0].Float32(), args[1].Float32(), args[2].Float32(), args[3].Float32())
+		case "w":
+			c.SetLineWidth(args[0].Float32())
 		}
 	}
+
+	return nil
 }
