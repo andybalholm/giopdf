@@ -2,10 +2,11 @@ package giopdf
 
 import (
 	"fmt"
+	"io"
 
 	"gioui.org/op"
+	"github.com/andybalholm/giopdf/pdf"
 	"github.com/benoitkugler/pdf/contentstream"
-	"github.com/benoitkugler/pdf/model"
 	"github.com/benoitkugler/pdf/reader/parser"
 )
 
@@ -13,21 +14,21 @@ import (
 // The caller should do the appropriate transformation and scaling to ensure
 // that the content is not rendered upside down. (The PDF coordinate system
 // starts in the lower left, not in the upper left like Gio's.)
-func RenderPage(ops *op.Ops, page *model.PageObject) error {
+func RenderPage(ops *op.Ops, page pdf.Page) error {
 	r := newRenderer(ops)
-	r.resources = page.Resources
+	r.page = page
 
-	for _, stream := range page.Contents {
-		decoded, err := stream.Decode()
-		if err != nil {
-			return err
-		}
-		operations, err := parser.ParseContent(decoded, page.Resources.ColorSpace)
-		if err != nil {
-			return err
-		}
-		r.do(operations)
+	stream := page.V.Key("Contents")
+
+	decoded, err := io.ReadAll(stream.Reader())
+	if err != nil {
+		return err
 	}
+	operations, err := parser.ParseContent(decoded, nil)
+	if err != nil {
+		return err
+	}
+	r.do(operations)
 
 	return nil
 }
@@ -35,7 +36,7 @@ func RenderPage(ops *op.Ops, page *model.PageObject) error {
 type renderer struct {
 	*Canvas
 
-	resources *model.ResourcesDict
+	page pdf.Page
 }
 
 func newRenderer(ops *op.Ops) *renderer {
@@ -75,43 +76,55 @@ func (r *renderer) do(operations []contentstream.Operation) {
 		case contentstream.OpSetDash:
 			r.SetDash(op.Dash.Array, op.Dash.Phase)
 		case contentstream.OpSetExtGState:
-			gs := r.resources.ExtGState[op.Dict]
-			if gs == nil {
+			gs := r.page.Resources().Key("ExtGState").Key(string(op.Dict))
+			if gs.IsNull() {
 				fmt.Printf("ExtGState resource missing: %v", op.Dict)
 				continue
 			}
-			if gs.LW != 0 {
-				r.SetLineWidth(gs.LW)
-			}
-			if lc, ok := gs.LC.(model.ObjInt); ok {
-				r.SetLineCap(int(lc))
-			}
-			if lj, ok := gs.LJ.(model.ObjInt); ok {
-				r.SetLineJoin(int(lj))
-			}
-			if gs.ML != 0 {
-				r.SetMiterLimit(gs.ML)
-			}
-			if gs.D != nil {
-				r.SetDash(gs.D.Array, gs.D.Phase)
-			}
-			if CA, ok := gs.CA.(model.ObjFloat); ok {
-				r.SetStrokeAlpha(float32(CA))
-			}
-			if ca, ok := gs.Ca.(model.ObjFloat); ok {
-				r.SetFillAlpha(float32(ca))
+			for _, k := range gs.Keys() {
+				v := gs.Key(k)
+				switch k {
+				case "Type":
+					// ignore
+				case "LW":
+					r.SetLineWidth(v.Float32())
+				case "LC":
+					r.SetLineCap(v.Int())
+				case "LJ":
+					r.SetLineJoin(v.Int())
+				case "ML":
+					r.SetMiterLimit(v.Float32())
+				case "D":
+					array := v.Index(0)
+					phase := v.Index(1).Float32()
+					dashes := make([]float32, array.Len())
+					for i := range dashes {
+						dashes[i] = array.Index(i).Float32()
+					}
+					r.SetDash(dashes, phase)
+				case "CA":
+					r.SetStrokeAlpha(v.Float32())
+				case "ca":
+					r.SetFillAlpha(v.Float32())
+				case "BM":
+					if v.Name() != "Normal" {
+						fmt.Printf("Unsupported blend mode: %v\n", v)
+					}
+				default:
+					fmt.Printf("Unsupported graphics state parameter %v = %v\n", k, v)
+				}
 			}
 		case contentstream.OpSetFillGray:
 			r.SetFillGray(op.G)
 		case contentstream.OpSetFillRGBColor:
 			r.SetRGBFillColor(op.R, op.G, op.B)
 		case contentstream.OpSetFont:
-			fd := r.resources.Font[op.Font]
-			if fd == nil {
+			fd := r.page.Font(string(op.Font))
+			if fd.V.IsNull() {
 				fmt.Printf("Font resource missing: $v", op.Font)
 				continue
 			}
-			f, err := importPDFFont(fd.Subtype)
+			f, err := importPDFFont(fd)
 			if err != nil {
 				fmt.Println("Error importing font:", err)
 				continue
@@ -133,19 +146,22 @@ func (r *renderer) do(operations []contentstream.Operation) {
 			r.Stroke()
 		case contentstream.OpTextMove:
 			r.TextMove(op.X, op.Y)
-		case contentstream.OpXObject:
-			x := r.resources.XObject[op.XObject]
-			switch x := x.(type) {
-			case *model.XObjectImage:
-				img, err := decodeImage(x)
-				if err != nil {
-					fmt.Println(err)
-					continue
+
+			/* TODO:
+			case contentstream.OpXObject:
+				x := r.resources.XObject[op.XObject]
+				switch x := x.(type) {
+				case *model.XObjectImage:
+					img, err := decodeImage(x)
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
+					r.Image(img)
+				default:
+					fmt.Printf("XObject (%T): %v\n", x, x)
 				}
-				r.Image(img)
-			default:
-				fmt.Printf("XObject (%T): %v\n", x, x)
-			}
+			*/
 		default:
 			fmt.Printf("%T: %v\n", op, op)
 		}

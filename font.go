@@ -2,10 +2,10 @@ package giopdf
 
 import (
 	"fmt"
+	"io"
 
 	"gioui.org/f32"
-	"github.com/benoitkugler/pdf/model"
-	"github.com/benoitkugler/textlayout/fonts/simpleencodings"
+	"github.com/andybalholm/giopdf/pdf"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
@@ -91,14 +91,14 @@ func SimpleFontFromSFNT(sf *sfnt.Font, encoding [256]rune) (*SimpleFont, error) 
 	return simple, nil
 }
 
-func importPDFFont(f model.Font) (Font, error) {
-	switch f := f.(type) {
-	case model.FontTrueType:
-		file := f.FontDescriptor.FontFile
-		if file == nil {
-			return nil, fmt.Errorf("%v does not have embedded font data", f.FontName())
+func importPDFFont(f pdf.Font) (Font, error) {
+	switch f.V.Key("Subtype").Name() {
+	case "TrueType":
+		file := f.V.Key("FontDescriptor").Key("FontFile2")
+		if file.IsNull() {
+			return nil, fmt.Errorf("%v does not have embedded font data", f.V.Key("BaseFont"))
 		}
-		data, err := file.Decode()
+		data, err := io.ReadAll(file.Reader())
 		if err != nil {
 			return nil, err
 		}
@@ -107,31 +107,16 @@ func importPDFFont(f model.Font) (Font, error) {
 			return nil, err
 		}
 
-		var byte2rune map[byte]rune
-		switch f.Encoding {
-		case model.MacRomanEncoding:
-			byte2rune = simpleencodings.MacRoman.ByteToRune()
-		case model.MacExpertEncoding:
-			byte2rune = simpleencodings.MacExpert.ByteToRune()
-		case model.WinAnsiEncoding:
-			byte2rune = simpleencodings.WinAnsi.ByteToRune()
+		switch f.V.Key("Encoding").Name() {
+		case "WinAnsiEncoding":
+			return SimpleFontFromSFNT(sf, pdf.WinAnsiEncoding)
+		case "MacRomanEncoding":
+			return SimpleFontFromSFNT(sf, pdf.MacRomanEncoding)
+		default:
+			return nil, fmt.Errorf("%v: unknown encoding: %v", f.V.Key("BaseFont"), f.V.Key("Encoding"))
 		}
-		if byte2rune == nil {
-			return nil, fmt.Errorf("%v: unknown encoding: %v", f.FontName, f.Encoding)
-		}
-
-		var encoding [256]rune
-		for b, r := range byte2rune {
-			encoding[b] = r
-		}
-
-		simple, err := SimpleFontFromSFNT(sf, encoding)
-		if err != nil {
-			return nil, err
-		}
-		return simple, nil
 
 	default:
-		return nil, fmt.Errorf("%v is an unsupported font type (%T)", f.FontName(), f)
+		return nil, fmt.Errorf("%v is an unsupported font type (%v)", f.V.Key("BaseFont"), f.V.Key("Subtype"))
 	}
 }

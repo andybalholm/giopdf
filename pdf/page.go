@@ -65,7 +65,6 @@ func (p Page) findInherited(key string) Value {
 	return Value{}
 }
 
-/*
 func (p Page) MediaBox() Value {
 	return p.findInherited("MediaBox")
 }
@@ -73,7 +72,6 @@ func (p Page) MediaBox() Value {
 func (p Page) CropBox() Value {
 	return p.findInherited("CropBox")
 }
-*/
 
 // Resources returns the resources dictionary associated with the page.
 func (p Page) Resources() Value {
@@ -139,9 +137,9 @@ func (f Font) Encoder() TextEncoding {
 	case Name:
 		switch enc.Name() {
 		case "WinAnsiEncoding":
-			return &byteEncoder{&winAnsiEncoding}
+			return &byteEncoder{&WinAnsiEncoding}
 		case "MacRomanEncoding":
-			return &byteEncoder{&macRomanEncoding}
+			return &byteEncoder{&MacRomanEncoding}
 		case "Identity-H":
 			// TODO: Should be big-endian UCS-2 decoder
 			return &nopEncoder{}

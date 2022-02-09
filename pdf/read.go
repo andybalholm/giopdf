@@ -576,6 +576,16 @@ func (v Value) Int64() int64 {
 	return x
 }
 
+// Int returns v's int value, converting from int64.
+// If v.Kind() != Int64, Int returns 0.
+func (v Value) Int() int {
+	x, ok := v.data.(int64)
+	if !ok {
+		return 0
+	}
+	return int(x)
+}
+
 // Float64 returns v's float64 value, converting from integer if necessary.
 // If v.Kind() != Float64 and v.Kind() != Int64, Float64 returns 0.
 func (v Value) Float64() float64 {
@@ -588,6 +598,20 @@ func (v Value) Float64() float64 {
 		return 0
 	}
 	return x
+}
+
+// Float32 returns v's float32 value, converting from integer or float64.
+// If v.Kind() != Float64 and v.Kind() != Int64, Float32 returns 0.
+func (v Value) Float32() float32 {
+	x, ok := v.data.(float64)
+	if !ok {
+		x, ok := v.data.(int64)
+		if ok {
+			return float32(x)
+		}
+		return 0
+	}
+	return float32(x)
 }
 
 // RawString returns v's string value.
