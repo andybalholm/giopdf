@@ -916,6 +916,67 @@ func (r *pngUpReader) Read(b []byte) (int, error) {
 	return n, nil
 }
 
+// HasFilter returns whether v is a stream encoded with the specified filter.
+// (There may be other filters as well.)
+func (v Value) HasFilter(filterName string) bool {
+	if _, ok := v.data.(stream); !ok {
+		return false
+	}
+	filter := v.Key("Filter")
+	switch filter.Kind() {
+	case Name:
+		return filter.Name() == filterName
+	case Array:
+		for i := 0; i < filter.Len(); i++ {
+			if filter.Index(i).Name() == filterName {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// EncodedReader returns the data contained in the stream v.
+// It does not apply the specified filter, so the returned data will be in the
+// format that filter expects as input (assuming the stream actually has that
+// filter).
+// Before calling EncodedReader, you should check whether the stream has the
+// filter you are interested in, by calling HasFilter.
+func (v Value) EncodedReader(filterName string) io.Reader {
+	x, ok := v.data.(stream)
+	if !ok {
+		return &errorReadCloser{fmt.Errorf("stream not present")}
+	}
+	var rd io.Reader
+	rd = io.NewSectionReader(v.r.f, x.offset, v.Key("Length").Int64())
+	if v.r.key != nil {
+		rd = decryptStream(v.r.key, v.r.useAES, x.ptr, rd)
+	}
+	filter := v.Key("Filter")
+	param := v.Key("DecodeParms")
+	switch filter.Kind() {
+	default:
+		panic(fmt.Errorf("unsupported filter %v", filter))
+	case Null:
+		// ok
+	case Name:
+		if filter.Name() == filterName {
+			return rd
+		}
+		rd = applyFilter(rd, filter.Name(), param)
+	case Array:
+		for i := 0; i < filter.Len(); i++ {
+			if filter.Index(i).Name() == filterName {
+				return rd
+			}
+			rd = applyFilter(rd, filter.Index(i).Name(), param.Index(i))
+		}
+	}
+
+	return rd
+}
+
 var passwordPad = []byte{
 	0x28, 0xBF, 0x4E, 0x5E, 0x4E, 0x75, 0x8A, 0x41, 0x64, 0x00, 0x4E, 0x56, 0xFF, 0xFA, 0x01, 0x08,
 	0x2E, 0x2E, 0x00, 0xB6, 0xD0, 0x68, 0x3E, 0x80, 0x2F, 0x0C, 0xA9, 0xFE, 0x64, 0x53, 0x69, 0x7A,

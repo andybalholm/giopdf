@@ -4,12 +4,18 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"io"
 
 	"github.com/andybalholm/giopdf/pdf"
 )
 
 func decodeImage(img pdf.Value) (image.Image, error) {
+	if img.HasFilter("DCTDecode") {
+		// It's a JPEG image.
+		return jpeg.Decode(img.EncodedReader("DCTDecode"))
+	}
+
 	data, err := io.ReadAll(img.Reader())
 	if err != nil {
 		return nil, err
