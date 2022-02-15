@@ -156,6 +156,8 @@ func RenderPage(ops *op.Ops, page pdf.Page) error {
 			}
 		case "Tj":
 			c.ShowText(args[0].RawString())
+		case "Tr":
+			c.SetTextRendering(args[0].Int())
 		case "Tz":
 			c.SetHScale(args[0].Float32())
 		case "v":

@@ -24,9 +24,19 @@ func (c *Canvas) ShowText(s string) {
 	for _, g := range glyphs {
 		glyphSpace := c.textMatrix.Mul(sizeMatrix)
 		c.Path = append(c.Path, transformPath(g.Outlines, glyphSpace)...)
+		// TODO: clipping
+		switch c.textRenderingMode {
+		case 0, 4:
+			c.Fill()
+		case 1, 5:
+			c.Stroke()
+		case 2, 6:
+			c.FillAndStroke()
+		case 3, 7:
+			// Invisible
+		}
 		c.textMatrix = c.textMatrix.Offset(f32.Pt(g.Width*hSize, 0))
 	}
-	c.Fill()
 }
 
 // Kern moves the next text character to the left the specified amount.

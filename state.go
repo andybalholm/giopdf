@@ -19,11 +19,12 @@ type graphicsState struct {
 	dashes    []float32
 	dashPhase float32
 
-	font       Font
-	fontSize   float32
-	hScale     float32
-	textMatrix f32.Affine2D
-	lineMatrix f32.Affine2D
+	font              Font
+	fontSize          float32
+	hScale            float32
+	textMatrix        f32.Affine2D
+	lineMatrix        f32.Affine2D
+	textRenderingMode int
 
 	transforms []op.TransformStack
 }
@@ -141,4 +142,9 @@ func (s *graphicsState) TextMove(x, y float32) {
 // SetHScale sets the horizontal scaling percent for text.
 func (s *graphicsState) SetHScale(scale float32) {
 	s.hScale = scale
+}
+
+// SetTextRendering sets the text rendering mode.
+func (s *graphicsState) SetTextRendering(mode int) {
+	s.textRenderingMode = mode
 }
