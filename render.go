@@ -139,6 +139,21 @@ func RenderPage(ops *op.Ops, page pdf.Page) error {
 				continue
 			}
 			c.SetFont(f, args[1].Float32())
+		case "TJ":
+			if c.font == nil {
+				// TODO: remove
+				continue
+			}
+			a := args[0]
+			for i := 0; i < a.Len(); i++ {
+				v := a.Index(i)
+				switch v.Kind() {
+				case pdf.Real, pdf.Integer:
+					c.Kern(v.Float32())
+				case pdf.String:
+					c.ShowText(v.RawString())
+				}
+			}
 		case "Tj":
 			c.ShowText(args[0].RawString())
 		case "Tz":

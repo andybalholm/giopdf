@@ -1,11 +1,15 @@
 package giopdf
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
 	"gioui.org/f32"
 	"github.com/andybalholm/giopdf/pdf"
+	"github.com/benoitkugler/textlayout/fonts"
+	"github.com/benoitkugler/textlayout/fonts/simpleencodings"
+	"github.com/benoitkugler/textlayout/fonts/type1"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
@@ -91,6 +95,113 @@ func SimpleFontFromSFNT(sf *sfnt.Font, encoding [256]rune) (*SimpleFont, error) 
 	return simple, nil
 }
 
+func getEncoding(e pdf.Value) ([256]string, error) {
+	switch e.Kind() {
+	case pdf.Null:
+		return [256]string{}, nil
+
+	case pdf.Name:
+		switch e.Name() {
+		case "MacRomanEncoding":
+			return [256]string(simpleencodings.MacRoman), nil
+		case "MaxExpertEncoding":
+			return [256]string(simpleencodings.MacExpert), nil
+		case "WinAnsiEncoding":
+			return [256]string(simpleencodings.WinAnsi), nil
+		default:
+			return [256]string{}, fmt.Errorf("unknown encoding: %v", e)
+		}
+
+	case pdf.Dict:
+		enc, err := getEncoding(e.Key("BaseEncoding"))
+		if err != nil {
+			return enc, err
+		}
+		diff := e.Key("Differences")
+		code := 0
+		for i := 0; i < diff.Len(); i++ {
+			item := diff.Index(i)
+			switch item.Kind() {
+			case pdf.Integer:
+				code = item.Int() - 1
+			case pdf.Name:
+				code++
+				enc[code] = item.Name()
+			}
+		}
+		return enc, nil
+
+	default:
+		return [256]string{}, fmt.Errorf("invalid encoding: %v", e)
+	}
+}
+
+// SimpleFontFromType1 converts a parsed Type 1 font to a SimpleFont, using the
+// encoding provided (normally taken from the font dictionary).
+func SimpleFontFromType1(f *type1.Font, encoding pdf.Value) (*SimpleFont, error) {
+	nameToGID := map[string]fonts.GID{}
+	for i := fonts.GID(0); ; i++ {
+		name := f.GlyphName(i)
+		if name == "" {
+			break
+		}
+		nameToGID[name] = i
+	}
+
+	enc, err := getEncoding(encoding)
+	if err != nil {
+		return nil, err
+	}
+	for i, name := range enc {
+		// Fill in the blanks with the font's builtin encoding.
+		if name == "" {
+			enc[i] = f.Encoding[i]
+		}
+	}
+
+	fm := f32.NewAffine2D(f.FontMatrix[0], f.FontMatrix[2], f.FontMatrix[4], f.FontMatrix[1], f.FontMatrix[3], f.FontMatrix[5])
+
+	simple := new(SimpleFont)
+	for i, name := range enc {
+		var g Glyph
+		gi, ok := nameToGID[name]
+		if !ok {
+			continue
+		}
+
+		width := f.HorizontalAdvance(gi)
+		g.Width = fm.Transform(f32.Pt(width, 0)).X
+
+		gd := f.GlyphData(gi, 0, 0)
+		if gd == nil {
+			continue
+		}
+		outline := gd.(fonts.GlyphOutline)
+		var p PathBuilder
+		for _, seg := range outline.Segments {
+			p0 := fm.Transform(f32.Point(seg.Args[0]))
+			p1 := fm.Transform(f32.Point(seg.Args[1]))
+			p2 := fm.Transform(f32.Point(seg.Args[2]))
+			switch seg.Op {
+			case fonts.SegmentOpMoveTo:
+				p.ClosePath()
+				p.MoveTo(p0.X, p0.Y)
+			case fonts.SegmentOpLineTo:
+				p.LineTo(p0.X, p0.Y)
+			case fonts.SegmentOpQuadTo:
+				p.QuadraticCurveTo(p0.X, p0.Y, p1.X, p1.Y)
+			case fonts.SegmentOpCubeTo:
+				p.CurveTo(p0.X, p0.Y, p1.X, p1.Y, p2.X, p2.Y)
+			}
+		}
+		p.ClosePath()
+		g.Outlines = p.Path
+		simple.Glyphs[i] = g
+	}
+
+	return simple, nil
+}
+
 func importPDFFont(f pdf.Font) (Font, error) {
 	switch f.V.Key("Subtype").Name() {
 	case "TrueType":
@@ -115,6 +226,21 @@ func importPDFFont(f pdf.Font) (Font, error) {
 		default:
 			return nil, fmt.Errorf("%v: unknown encoding: %v", f.V.Key("BaseFont"), f.V.Key("Encoding"))
 		}
+
+	case "Type1":
+		file := f.V.Key("FontDescriptor").Key("FontFile")
+		if file.IsNull() {
+			return nil, fmt.Errorf("%v does not have embedded font data", f.V.Key("BaseFont"))
+		}
+		data, err := io.ReadAll(file.Reader())
+		if err != nil {
+			return nil, err
+		}
+		t1f, err := type1.Parse(bytes.NewReader(data))
+		if err != nil {
+			return nil, err
+		}
+		return SimpleFontFromType1(t1f, f.V.Key("Encoding"))
 
 	default:
 		return nil, fmt.Errorf("%v is an unsupported font type (%v)", f.V.Key("BaseFont"), f.V.Key("Subtype"))

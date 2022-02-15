@@ -28,3 +28,10 @@ func (c *Canvas) ShowText(s string) {
 	}
 	c.Fill()
 }
+
+// Kern moves the next text character to the left the specified amount.
+// The distance is in units of 1/1000 of an em.
+func (c *Canvas) Kern(amount float32) {
+	distance := c.fontSize * c.hScale / 100 * amount / 1000
+	c.textMatrix = c.textMatrix.Offset(f32.Pt(-distance, 0))
+}
