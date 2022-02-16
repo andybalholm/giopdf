@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/benoitkugler/textlayout/fonts"
 	ps "github.com/benoitkugler/textlayout/fonts/psinterpreter"
@@ -126,6 +127,7 @@ func (p *cffParser) parse() ([]Font, error) {
 		if err != nil {
 			return nil, err
 		}
+		out[i].FontMatrix = topDict.fontMatrix
 	}
 
 	// Parse the Global Subrs [Subroutines] INDEX,
@@ -224,6 +226,7 @@ func (p *cffParser) parseTopDicts() ([]topDictData, error) {
 		topDict.familyName = unsetSID
 		topDict.weight = unsetSID
 		topDict.cidFontName = unsetSID
+		topDict.fontMatrix = []float32{0.001, 0, 0, 0.001, 0, 0}
 
 		if err = psi.Run(buf, nil, nil, topDict); err != nil {
 			return nil, err
@@ -672,6 +675,7 @@ type topDictData struct {
 	cidFontName                                        uint16
 	privateDictOffset                                  int32
 	privateDictLength                                  int32
+	fontMatrix                                         []float32
 }
 
 // resolve the strings
@@ -812,7 +816,16 @@ var topDictOperators = [2][]topDictOperator{
 			}
 			return nil
 		}, +1 /*CharstringType*/},
-		7:  {topDictNoOp, -1 /*FontMatrix*/},
+		7: {func(t *topDictData, s *ps.Machine) error {
+			if s.ArgStack.Top != 6 {
+				return fmt.Errorf("wrong number of arguments for FontMatrix: got %d, want 6", s.ArgStack.Top)
+			}
+			t.fontMatrix = make([]float32, 6)
+			for i := range t.fontMatrix {
+				t.fontMatrix[i] = math.Float32frombits(uint32(s.ArgStack.Vals[i]))
+			}
+			return nil
+		}, -1 /*FontMatrix*/},
 		8:  {topDictNoOp, +1 /*StrokeWidth*/},
 		20: {topDictNoOp, +1 /*SyntheticBase*/},
 		21: {topDictNoOp, +1 /*PostScript*/},

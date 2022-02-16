@@ -27,6 +27,7 @@ type Font struct {
 	fdSelect    fdSelect // only valid for CIDFonts
 	charset     []uint16 // indexed by glyph ID
 	Encoding    *simpleencodings.Encoding
+	FontMatrix  []float32
 
 	cmap fonts.CmapSimple // see synthetizeCmap
 

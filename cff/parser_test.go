@@ -62,6 +62,11 @@ func TestParseCFF(t *testing.T) {
 			if g.Width != 200 {
 				t.Errorf("unexpected width for glyph %s in %s: got %d, want 200", font.GlyphName(glyphIndex), file, g.Width)
 			}
+
+			matrix := fmt.Sprint(font.FontMatrix)
+			if matrix != "[0.001 0 0 0.001 0 0]" {
+				t.Errorf("Unexpected font matrix in %s: got %v, want [0.001 0 0 0.001 0 0]", file, font.FontMatrix)
+			}
 		}
 	}
 }
