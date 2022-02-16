@@ -47,9 +47,20 @@ func TestParseCFF(t *testing.T) {
 		}
 
 		for glyphIndex := range font.charstrings {
-			_, _, err := font.LoadGlyph(fonts.GID(glyphIndex))
+			_, err := font.LoadGlyph(fonts.GID(glyphIndex))
 			if err != nil {
 				t.Fatalf("can't get extents for %s GID %d: %s", file, glyphIndex, err)
+			}
+		}
+
+		if file == "test/AAAPKB+SourceSansPro-Bold.cff" {
+			glyphIndex := fonts.GID(1)
+			g, err := font.LoadGlyph(glyphIndex)
+			if err != nil {
+				t.Fatalf("can't get extents for %s GID %d: %s", file, glyphIndex, err)
+			}
+			if g.Width != 200 {
+				t.Errorf("unexpected width for glyph %s in %s: got %d, want 200", font.GlyphName(glyphIndex), file, g.Width)
 			}
 		}
 	}

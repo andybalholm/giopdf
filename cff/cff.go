@@ -37,6 +37,7 @@ type Font struct {
 	// array of length 1 for non CIDFonts
 	// For CIDFonts, it can be safely indexed by `fdSelect` output
 	localSubrs [][][]byte
+	priv       []privateDict
 	fonts.PSInfo
 }
 

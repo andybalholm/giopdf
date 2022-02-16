@@ -7,9 +7,15 @@ import (
 	ps "github.com/benoitkugler/textlayout/fonts/psinterpreter"
 )
 
+type Glyph struct {
+	Outlines []fonts.Segment
+	Width    int
+	Bounds   ps.PathBounds
+}
+
 // LoadGlyph parses the glyph charstring to compute segments and path bounds.
 // It returns an error if the glyph is invalid or if decoding the charstring fails.
-func (f *Font) LoadGlyph(glyph fonts.GID) ([]fonts.Segment, ps.PathBounds, error) {
+func (f *Font) LoadGlyph(glyph fonts.GID) (Glyph, error) {
 	var (
 		psi    ps.Machine
 		loader type2CharstringHandler
@@ -19,16 +25,23 @@ func (f *Font) LoadGlyph(glyph fonts.GID) ([]fonts.Segment, ps.PathBounds, error
 	if f.fdSelect != nil {
 		index, err = f.fdSelect.fontDictIndex(glyph)
 		if err != nil {
-			return nil, ps.PathBounds{}, err
+			return Glyph{}, err
 		}
 	}
 	if int(glyph) >= len(f.charstrings) {
-		return nil, ps.PathBounds{}, fmt.Errorf("invalid glyph index %d", glyph)
+		return Glyph{}, fmt.Errorf("invalid glyph index %d", glyph)
 	}
 
 	subrs := f.localSubrs[index]
+	priv := f.priv[index]
+	loader.nominalWidthX = priv.nominalWidthX
+	loader.width = priv.defaultWidthX
 	err = psi.Run(f.charstrings[glyph], subrs, f.globalSubrs, &loader)
-	return loader.cs.Segments, loader.cs.Bounds, err
+	return Glyph{
+		Outlines: loader.cs.Segments,
+		Width:    int(loader.width),
+		Bounds:   loader.cs.Bounds,
+	}, nil
 }
 
 // type2CharstringHandler implements operators needed to fetch Type2 charstring metrics

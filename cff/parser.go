@@ -161,11 +161,13 @@ func (p *cffParser) parse() ([]Font, error) {
 		if !topDict.isCIDFont {
 			// Parse the Private DICT, whose location was found in the Top DICT.
 			var localSubrs [][]byte
-			localSubrs, err = p.parsePrivateDICT(topDict.privateDictOffset, topDict.privateDictLength)
+			var priv privateDict
+			priv, localSubrs, err = p.parsePrivateDICT(topDict.privateDictOffset, topDict.privateDictLength)
 			if err != nil {
 				return nil, err
 			}
 			out[i].localSubrs = [][][]byte{localSubrs}
+			out[i].priv = []privateDict{priv}
 		} else {
 			// Parse the Font Dict Select data, whose location was found in the Top
 			// DICT.
@@ -187,14 +189,14 @@ func (p *cffParser) parse() ([]Font, error) {
 				return nil, fmt.Errorf("invalid number of font dicts: %d (for %d)",
 					len(topDicts), indexExtent)
 			}
-			multiSubrs := make([][][]byte, len(topDicts))
-			for i, topDict := range topDicts {
-				multiSubrs[i], err = p.parsePrivateDICT(topDict.privateDictOffset, topDict.privateDictLength)
+			out[i].localSubrs = make([][][]byte, len(topDicts))
+			out[i].priv = make([]privateDict, len(topDicts))
+			for j, topDict := range topDicts {
+				out[i].priv[j], out[i].localSubrs[j], err = p.parsePrivateDICT(topDict.privateDictOffset, topDict.privateDictLength)
 				if err != nil {
 					return nil, err
 				}
 			}
-			out[i].localSubrs = multiSubrs
 		}
 	}
 
@@ -516,38 +518,35 @@ func (p *cffParser) parseFDSelect(offset int32, numGlyphs uint16) (fdSelect, err
 }
 
 // Parse Private DICT and the Local Subrs [Subroutines] INDEX
-func (p *cffParser) parsePrivateDICT(offset, length int32) ([][]byte, error) {
+func (p *cffParser) parsePrivateDICT(offset, length int32) (priv privateDict, subrs [][]byte, err error) {
 	if length == 0 {
-		return nil, nil
+		return privateDict{}, nil, nil
 	}
 	if err := p.seek(offset); err != nil {
-		return nil, err
+		return privateDict{}, nil, err
 	}
 	buf, err := p.read(int(length))
 	if err != nil {
-		return nil, err
+		return privateDict{}, nil, err
 	}
-	var (
-		psi  ps.Machine
-		priv privateDict
-	)
+	var psi ps.Machine
 	if err = psi.Run(buf, nil, nil, &priv); err != nil {
-		return nil, err
+		return privateDict{}, nil, err
 	}
 
 	if priv.subrsOffset == 0 {
-		return nil, nil
+		return priv, nil, nil
 	}
 
 	// "The local subrs offset is relative to the beginning of the Private DICT data"
 	if err = p.seek(offset + priv.subrsOffset); err != nil {
-		return nil, errors.New("invalid local subroutines offset")
+		return privateDict{}, nil, errors.New("invalid local subroutines offset")
 	}
-	subrs, err := p.parseIndex()
+	subrs, err = p.parseIndex()
 	if err != nil {
-		return nil, err
+		return privateDict{}, nil, err
 	}
-	return subrs, nil
+	return priv, subrs, nil
 }
 
 // read returns the n bytes from p.offset and advances p.offset by n.
