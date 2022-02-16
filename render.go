@@ -115,10 +115,18 @@ func RenderPage(ops *op.Ops, page pdf.Page) error {
 			c.LineTo(args[0].Float32(), args[1].Float32())
 		case "m":
 			c.MoveTo(args[0].Float32(), args[1].Float32())
+		case "n":
+			c.NoOpPaint()
 		case "Q":
 			c.Restore()
 		case "q":
 			c.Save()
+		case "re":
+			x := args[0].Float32()
+			y := args[1].Float32()
+			width := args[2].Float32()
+			height := args[3].Float32()
+			c.Rectangle(x, y, width, height)
 		case "RG":
 			c.SetRGBStrokeColor(args[0].Float32(), args[1].Float32(), args[2].Float32())
 		case "rg":
@@ -162,6 +170,8 @@ func RenderPage(ops *op.Ops, page pdf.Page) error {
 			c.SetHScale(args[0].Float32())
 		case "v":
 			c.CurveV(args[0].Float32(), args[1].Float32(), args[2].Float32(), args[3].Float32())
+		case "W", "W*":
+			c.Clip()
 		case "w":
 			c.SetLineWidth(args[0].Float32())
 		}

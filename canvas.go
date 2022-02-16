@@ -17,7 +17,8 @@ type Canvas struct {
 	PathBuilder
 	graphicsState
 
-	stateStack []graphicsState
+	stateStack      []graphicsState
+	setClippingPath bool
 
 	ops *op.Ops
 }
@@ -99,30 +100,52 @@ func (c *Canvas) stroke() {
 	paint.FillShape(c.ops, c.strokeColor, s.Op(c.ops))
 }
 
+func (c *Canvas) finishPath() {
+	if c.setClippingPath {
+		ps := toPathSpec(c.ops, c.Path, true)
+		cs := clip.Outline{ps}.Op().Push(c.ops)
+		c.clippingPaths = append(c.clippingPaths, cs)
+	}
+	c.setClippingPath = false
+	c.Path = c.Path[:0]
+}
+
 // Fill fills the current path.
 func (c *Canvas) Fill() {
 	c.fill()
-	c.Path = c.Path[:0]
+	c.finishPath()
 }
 
 // Stroke strokes (outlines) the current path.
 func (c *Canvas) Stroke() {
 	c.stroke()
-	c.Path = c.Path[:0]
+	c.finishPath()
 }
 
 // CloseAndStroke closes the current path before stroking it it.
 func (c *Canvas) CloseAndStroke() {
 	c.ClosePath()
 	c.stroke()
-	c.Path = c.Path[:0]
+	c.finishPath()
 }
 
 // FillAndStroke fills the current path and then strokes (outlines) it.
 func (c *Canvas) FillAndStroke() {
 	c.fill()
 	c.stroke()
-	c.Path = c.Path[:0]
+	c.finishPath()
+}
+
+// NoOpPaint finishes the current path without filling or stroking it.
+// It is normally used to apply a clipping path after calling Clip.
+func (c *Canvas) NoOpPaint() {
+	c.finishPath()
+}
+
+// Clip causes the current path to be added to the clipping path after it is
+// painted.
+func (c *Canvas) Clip() {
+	c.setClippingPath = true
 }
 
 // CloseFillAndStroke closes the current path before filling and stroking it.
@@ -130,20 +153,24 @@ func (c *Canvas) CloseFillAndStroke() {
 	c.ClosePath()
 	c.fill()
 	c.stroke()
-	c.Path = c.Path[:0]
+	c.finishPath()
 }
 
 // Save pushes a copy of the current graphics state onto the state stack.
 func (c *Canvas) Save() {
 	c.stateStack = append(c.stateStack, c.graphicsState)
 	c.transforms = nil
+	c.clippingPaths = nil
 }
 
 // Restore restores the graphics state, popping it off the stack.
 func (c *Canvas) Restore() {
-	// First pop off the TransformStack entries that were saved since the last Save call.
+	// First pop off the TransformStack and clip.Stack entries that were saved since the last Save call.
 	for i := len(c.transforms) - 1; i >= 0; i-- {
 		c.transforms[i].Pop()
+	}
+	for i := len(c.clippingPaths) - 1; i >= 0; i-- {
+		c.clippingPaths[i].Pop()
 	}
 
 	n := len(c.stateStack) - 1

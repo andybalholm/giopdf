@@ -5,6 +5,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 )
 
 type graphicsState struct {
@@ -26,7 +27,8 @@ type graphicsState struct {
 	lineMatrix        f32.Affine2D
 	textRenderingMode int
 
-	transforms []op.TransformStack
+	transforms    []op.TransformStack
+	clippingPaths []clip.Stack
 }
 
 func rgbColor(r, g, b float32, alpha byte) color.NRGBA {
