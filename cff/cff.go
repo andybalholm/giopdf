@@ -1,8 +1,6 @@
-// Package type1c provides a parser for the CFF font format
+// Package cff provides a parser for the CFF font format
 // defined at https://www.adobe.com/content/dam/acom/en/devnet/font/pdfs/5176.CFF.pdf.
-// It can be used to read standalone CFF font files, but is mainly used
-// through the truetype package to read embedded CFF glyph tables.
-package type1c
+package cff
 
 import (
 	"errors"
@@ -15,10 +13,6 @@ import (
 	"github.com/benoitkugler/textlayout/fonts/simpleencodings"
 )
 
-// var Loader fonts.FontLoader = loader{}
-
-// var _ fonts.Face = (*Font)(nil)
-
 type loader struct{}
 
 // Load reads standalone .cff font files and may
@@ -27,7 +21,7 @@ func Load(file fonts.Resource) ([]Font, error) {
 	return parse(file)
 }
 
-// Font represents a parsed Font font.
+// Font represents a parsed CFF font.
 type Font struct {
 	userStrings userStrings
 	fdSelect    fdSelect // only valid for CIDFonts
@@ -249,8 +243,3 @@ func (f *Font) LoadSummary() (fonts.FontSummary, error) {
 		HasColorGlyphs:    false,
 	}, nil
 }
-
-// func (Font) LoadBitmaps() []fonts.BitmapSize { return nil }
-// func (f *Font) LoadMetrics() fonts.FaceMetrics {
-// 	return nil // TODO:
-// }

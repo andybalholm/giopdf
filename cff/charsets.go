@@ -1,4 +1,4 @@
-package type1c
+package cff
 
 var (
 	charsetISOAdobe = [229]uint16{

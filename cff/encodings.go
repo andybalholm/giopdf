@@ -1,4 +1,4 @@
-package type1c
+package cff
 
 import "github.com/benoitkugler/textlayout/fonts/simpleencodings"
 

@@ -1,4 +1,4 @@
-package type1c
+package cff
 
 // code is adapted from golang.org/x/image/font/sfnt
 
