@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"gioui.org/f32"
+	"github.com/andybalholm/giopdf/cff"
 	"github.com/andybalholm/giopdf/pdf"
 	"github.com/benoitkugler/textlayout/fonts"
 	"github.com/benoitkugler/textlayout/fonts/simpleencodings"
@@ -48,7 +49,7 @@ func scalePoint(p fixed.Point26_6, ppem fixed.Int26_6) f32.Point {
 
 // SimpleFontFromSFNT converts an SFNT (TrueType or OpenType) font to a
 // SimpleFont with the specified encoding.
-func SimpleFontFromSFNT(data []byte, encoding pdf.Value) (*SimpleFont, error) {
+func SimpleFontFromSFNT(data []byte, enc simpleencodings.Encoding) (*SimpleFont, error) {
 	f, err := truetype.Parse(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
@@ -60,11 +61,7 @@ func SimpleFontFromSFNT(data []byte, encoding pdf.Value) (*SimpleFont, error) {
 
 	var GIDEncoding [256]fonts.GID
 
-	if !encoding.IsNull() {
-		enc, err := getEncoding(encoding)
-		if err != nil {
-			return nil, err
-		}
+	if enc != (simpleencodings.Encoding{}) {
 		for b, r := range enc.ByteToRune() {
 			gi, ok := f.NominalGlyph(r)
 			if ok {
@@ -181,8 +178,8 @@ func getEncoding(e pdf.Value) (simpleencodings.Encoding, error) {
 }
 
 // SimpleFontFromType1 converts a Type 1 font to a SimpleFont, using the
-// encoding provided (normally taken from the font dictionary).
-func SimpleFontFromType1(data []byte, encoding pdf.Value) (*SimpleFont, error) {
+// encoding provided.
+func SimpleFontFromType1(data []byte, enc simpleencodings.Encoding) (*SimpleFont, error) {
 	f, err := type1.Parse(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
@@ -197,10 +194,6 @@ func SimpleFontFromType1(data []byte, encoding pdf.Value) (*SimpleFont, error) {
 		nameToGID[name] = i
 	}
 
-	enc, err := getEncoding(encoding)
-	if err != nil {
-		return nil, err
-	}
 	for i, name := range enc {
 		// Fill in the blanks with the font's builtin encoding.
 		if name == "" {
@@ -232,6 +225,54 @@ func SimpleFontFromType1(data []byte, encoding pdf.Value) (*SimpleFont, error) {
 	return simple, nil
 }
 
+// SimpleFontFromCFF converts a CFF font to a SimpleFont, using the
+// encoding provided.
+func SimpleFontFromCFF(data []byte, enc simpleencodings.Encoding) (*SimpleFont, error) {
+	f, err := cff.Parse(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	nameToGID := map[string]fonts.GID{}
+	for i := fonts.GID(0); ; i++ {
+		name := f.GlyphName(i)
+		if name == "" {
+			break
+		}
+		nameToGID[name] = i
+	}
+
+	for i, name := range enc {
+		// Fill in the blanks with the font's builtin encoding.
+		if name == "" {
+			enc[i] = f.Encoding[i]
+		}
+	}
+
+	fm := f32.NewAffine2D(f.FontMatrix[0], f.FontMatrix[2], f.FontMatrix[4], f.FontMatrix[1], f.FontMatrix[3], f.FontMatrix[5])
+
+	simple := new(SimpleFont)
+	for i, name := range enc {
+		var g Glyph
+		gi, ok := nameToGID[name]
+		if !ok {
+			continue
+		}
+
+		gd, err := f.LoadGlyph(gi)
+		if err != nil {
+			return nil, err
+		}
+
+		g.Width = fm.Transform(f32.Pt(float32(gd.Width), 0)).X
+
+		g.Outlines = glyphOutline(fonts.GlyphOutline{Segments: gd.Outlines}, fm)
+		simple.Glyphs[i] = g
+	}
+
+	return simple, nil
+}
+
 // glyphOutline converts outline to our path format, transforming the points
 // with fm.
 func glyphOutline(outline fonts.GlyphOutline, fm f32.Affine2D) []PathElement {
@@ -256,7 +297,12 @@ func glyphOutline(outline fonts.GlyphOutline, fm f32.Affine2D) []PathElement {
 	return p.Path
 }
 
-func importPDFFont(f pdf.Font) (Font, error) {
+func importPDFFont(f pdf.Font) (font Font, err error) {
+	enc, err := getEncoding(f.V.Key("Encoding"))
+	if err != nil {
+		return nil, err
+	}
+
 	switch f.V.Key("Subtype").Name() {
 	case "TrueType":
 		file := f.V.Key("FontDescriptor").Key("FontFile2")
@@ -267,20 +313,49 @@ func importPDFFont(f pdf.Font) (Font, error) {
 		if err != nil {
 			return nil, err
 		}
-		return SimpleFontFromSFNT(data, f.V.Key("Encoding"))
+		font, err = SimpleFontFromSFNT(data, enc)
 
 	case "Type1":
-		file := f.V.Key("FontDescriptor").Key("FontFile")
-		if file.IsNull() {
-			return nil, fmt.Errorf("%v does not have embedded font data", f.V.Key("BaseFont"))
+		if f.V.Key("FontDescriptor").Key("FontFile3").Key("Subtype").Name() == "Type1C" {
+			file := f.V.Key("FontDescriptor").Key("FontFile3")
+			if file.IsNull() {
+				return nil, fmt.Errorf("%v does not have embedded font data", f.V.Key("BaseFont"))
+			}
+			data, err := io.ReadAll(file.Reader())
+			if err != nil {
+				return nil, err
+			}
+			font, err = SimpleFontFromCFF(data, enc)
+		} else {
+			file := f.V.Key("FontDescriptor").Key("FontFile")
+			if file.IsNull() {
+				return nil, fmt.Errorf("%v does not have embedded font data", f.V.Key("BaseFont"))
+			}
+			data, err := io.ReadAll(file.Reader())
+			if err != nil {
+				return nil, err
+			}
+			font, err = SimpleFontFromType1(data, enc)
 		}
-		data, err := io.ReadAll(file.Reader())
-		if err != nil {
-			return nil, err
-		}
-		return SimpleFontFromType1(data, f.V.Key("Encoding"))
 
 	default:
 		return nil, fmt.Errorf("%v is an unsupported font type (%v)", f.V.Key("BaseFont"), f.V.Key("Subtype"))
 	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Glyph widths from the font dictionary override widths from the font itself.
+	if simple, ok := font.(*SimpleFont); ok {
+		firstChar := f.V.Key("FirstChar").Int()
+		lastChar := f.V.Key("LastChar").Int()
+		widths := f.V.Key("Widths")
+
+		for i := firstChar; i <= lastChar; i++ {
+			simple.Glyphs[i].Width = widths.Index(i-firstChar).Float32() / 1000
+		}
+	}
+
+	return font, nil
 }
