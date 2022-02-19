@@ -169,7 +169,7 @@ func (s Segment) reverse() Segment {
 	return Segment{s.End, s.CP2, s.CP1, s.Start}
 }
 
-func ReversePath(path []Segment) []Segment {
+func reversePath(path []Segment) []Segment {
 	result := make([]Segment, len(path))
 	for i, s := range path {
 		result[len(result)-i-1] = s.reverse()
