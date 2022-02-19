@@ -95,7 +95,7 @@ func linearRoot(a, b float32) (root float32, ok bool) {
 // including the start and end points (t = 0 and t = 1).
 func (s Segment) extrema() []float32 {
 	var storage [8]float32
-	result := storage[:]
+	result := storage[:0]
 	a, b, c := s.CP1.X-s.Start.X, s.CP2.X-s.CP1.X, s.End.X-s.CP2.X
 	result = quadraticRoots(result, a, b, c)
 	if r, ok := linearRoot(b-a, c-b); ok {
