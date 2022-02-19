@@ -6,6 +6,10 @@ package stroke
 func strokeContour(c []Segment, width float32) (outer, inner []Segment) {
 	halfWidth := width / 2
 	for _, s := range c {
+		// Skip segments that don't do anything.
+		if s.CP1 == s.Start && s.CP2 == s.Start && s.End == s.Start {
+			continue
+		}
 		right, left := OffsetCurves(s, halfWidth)
 		if len(outer) > 0 && outer[len(outer)-1].End != right[0].Start {
 			// TODO: other join styles
