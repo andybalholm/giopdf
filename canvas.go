@@ -8,7 +8,7 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
-	"gioui.org/x/stroke"
+	"github.com/andybalholm/giopdf/stroke"
 )
 
 // A Canvas implements the PDF imaging model, drawing to a Gio operations list.
@@ -42,62 +42,53 @@ func (c *Canvas) fill() {
 }
 
 func (c *Canvas) stroke() {
-	var p stroke.Path
+	var p [][]stroke.Segment
+	var contour []stroke.Segment
 	var pos, lastMove f32.Point
 	for _, e := range c.Path {
 		switch e.Op {
 		case 'm':
 			lastMove = e.End
 			pos = e.End
-			p.Segments = append(p.Segments, stroke.MoveTo(e.End))
+			if len(contour) > 0 {
+				p = append(p, contour)
+				contour = nil
+			}
 		case 'l':
+			contour = append(contour, stroke.LinearSegment(pos, e.End))
 			pos = e.End
-			p.Segments = append(p.Segments, stroke.LineTo(e.End))
 		case 'c':
+			contour = append(contour, stroke.Segment{pos, e.CP1, e.CP2, e.End})
 			pos = e.End
-			p.Segments = append(p.Segments, stroke.CubeTo(e.CP1, e.CP2, e.End))
 		case 'h':
 			if pos != lastMove {
-				p.Segments = append(p.Segments, stroke.LineTo(lastMove))
+				contour = append(contour, stroke.LinearSegment(pos, lastMove))
 				pos = lastMove
 			}
 		}
 	}
-
-	s := stroke.Stroke{
-		Path:  p,
-		Width: c.lineWidth,
-
-		Cap:   stroke.FlatCap,
-		Join:  stroke.BevelJoin,
-		Miter: 10,
-
-		Dashes: stroke.Dashes{
-			Dashes: c.dashes,
-			Phase:  c.dashPhase,
-		},
+	if len(contour) > 0 {
+		p = append(p, contour)
+		contour = nil
 	}
 
-	switch c.lineCap {
-	case 1:
-		s.Cap = stroke.RoundCap
-	case 2:
-		s.Cap = stroke.SquareCap
-	}
+	outline := stroke.Stroke(p, c.lineWidth)
 
-	switch c.lineJoin {
-	case 0:
-		s.Join = stroke.BevelJoin
-		s.Miter = c.miterLimit
-	case 1:
-		s.Join = stroke.RoundJoin
-		s.Miter = 0
-	case 2:
-		s.Join = stroke.BevelJoin
-		s.Miter = 0
-	}
+	var path clip.Path
+	path.Begin(c.ops)
 
-	paint.FillShape(c.ops, c.strokeColor, s.Op(c.ops))
+	for _, contour := range outline {
+		path.MoveTo(contour[0].Start)
+		for i, s := range contour {
+			if i > 0 && s.Start != contour[i-1].End {
+				path.LineTo(s.Start)
+			}
+			path.CubeTo(s.CP1, s.CP2, s.End)
+		}
+	}
+	ps := path.End()
+
+	paint.FillShape(c.ops, c.strokeColor, clip.Outline{ps}.Op())
 }
 
 func (c *Canvas) finishPath() {
