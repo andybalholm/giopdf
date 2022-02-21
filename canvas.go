@@ -72,7 +72,10 @@ func (c *Canvas) stroke() {
 		contour = nil
 	}
 
-	outline := stroke.Stroke(p, c.lineWidth)
+	outline := stroke.Stroke(p, stroke.Options{
+		Width: c.lineWidth,
+		Cap:   stroke.CapStyle(c.lineCap),
+	})
 
 	var path clip.Path
 	path.Begin(c.ops)
