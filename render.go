@@ -138,7 +138,7 @@ func RenderPage(ops *op.Ops, page pdf.Page) error {
 		case "Tf":
 			fd := page.Font(args[0].Name())
 			if fd.V.IsNull() {
-				fmt.Printf("Font resource missing: $v", args[0])
+				fmt.Printf("Font resource missing: %v\n", args[0])
 				continue
 			}
 			f, err := importPDFFont(fd)

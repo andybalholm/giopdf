@@ -73,8 +73,10 @@ func (c *Canvas) stroke() {
 	}
 
 	outline := stroke.Stroke(p, stroke.Options{
-		Width: c.lineWidth,
-		Cap:   stroke.CapStyle(c.lineCap),
+		Width:      c.lineWidth,
+		Cap:        stroke.CapStyle(c.lineCap),
+		Join:       stroke.JoinStyle(c.lineJoin),
+		MiterLimit: c.miterLimit,
 	})
 
 	var path clip.Path
