@@ -68,3 +68,66 @@ func TestExtrema(t *testing.T) {
 		}
 	}
 }
+
+var lengthTests = []struct {
+	segment Segment
+	length  float32
+}{
+	{
+		segment: Segment{
+			Start: f32.Pt(0, 0),
+			CP1:   f32.Pt(25, 100),
+			CP2:   f32.Pt(75, 100),
+			End:   f32.Pt(100, 0),
+		},
+		length: 190.04332968932817,
+	},
+	{
+		segment: Segment{
+			Start: f32.Pt(0, 0),
+			CP1:   f32.Pt(50, 0),
+			CP2:   f32.Pt(100, 50),
+			End:   f32.Pt(100, 100),
+		},
+		length: 154.8852074945903,
+	},
+	{
+		segment: Segment{
+			Start: f32.Pt(0, 0),
+			CP1:   f32.Pt(50, 0),
+			CP2:   f32.Pt(100, 0),
+			End:   f32.Pt(150, 0),
+		},
+		// straight line; exact result should be 150.
+		length: 149.99999999999991,
+	},
+	{
+		segment: Segment{
+			Start: f32.Pt(0, 0),
+			CP1:   f32.Pt(50, 0),
+			CP2:   f32.Pt(100, 0),
+			End:   f32.Pt(-50, 0),
+		},
+		// cusp; exact result should be 150.
+		length: 136.9267662156362,
+	},
+	{
+		segment: Segment{
+			Start: f32.Pt(0, 0),
+			CP1:   f32.Pt(50, 0),
+			CP2:   f32.Pt(100, -50),
+			End:   f32.Pt(-50, 0),
+		},
+		// another cusp
+		length: 154.80848416537057,
+	},
+}
+
+func TestLength(t *testing.T) {
+	for _, c := range lengthTests {
+		length := c.segment.length()
+		if length != c.length {
+			t.Errorf("length for %v: got %g, want %g", c.segment, length, c.length)
+		}
+	}
+}

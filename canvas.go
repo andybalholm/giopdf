@@ -72,6 +72,10 @@ func (c *Canvas) stroke() {
 		contour = nil
 	}
 
+	if len(c.dashes) > 0 {
+		p = stroke.Dash(p, c.dashes, c.dashPhase)
+	}
+
 	outline := stroke.Stroke(p, stroke.Options{
 		Width:      c.lineWidth,
 		Cap:        stroke.CapStyle(c.lineCap),

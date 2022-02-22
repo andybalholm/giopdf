@@ -32,9 +32,12 @@ func simpleOffset(s Segment, d float32) Segment {
 	}
 }
 
+func hypot(p f32.Point) float32 {
+	return float32(math.Hypot(float64(p.X), float64(p.Y)))
+}
+
 func distance(a, b f32.Point) float32 {
-	d := b.Sub(a)
-	return float32(math.Hypot(float64(d.X), float64(d.Y)))
+	return hypot(b.Sub(a))
 }
 
 func rot90CW(p f32.Point) f32.Point { return f32.Pt(+p.Y, -p.X) }
