@@ -33,6 +33,16 @@ func LinearSegment(a, b f32.Point) Segment {
 	}
 }
 
+// QuadraticSegment converts a quadratic bezier segment to a cubic one.
+func QuadraticSegment(start, cp, end f32.Point) Segment {
+	return Segment{
+		Start: start,
+		CP1:   interpolate(0.6666666666666666, start, cp),
+		CP2:   interpolate(0.6666666666666666, end, cp),
+		End:   end,
+	}
+}
+
 // unitVector returns p scaled to that it lies on the unit circle (one unit
 // away from the origin, in the same direction. If p is (0, 0), it is returned
 // unchanged.
