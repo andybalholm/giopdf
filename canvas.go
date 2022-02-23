@@ -83,20 +83,7 @@ func (c *Canvas) stroke() {
 		MiterLimit: c.miterLimit,
 	})
 
-	var path clip.Path
-	path.Begin(c.ops)
-
-	for _, contour := range outline {
-		path.MoveTo(contour[0].Start)
-		for i, s := range contour {
-			if i > 0 && s.Start != contour[i-1].End {
-				path.LineTo(s.Start)
-			}
-			path.CubeTo(s.CP1, s.CP2, s.End)
-		}
-	}
-	ps := path.End()
-
+	ps := stroke.ToPathSpec(c.ops, outline)
 	paint.FillShape(c.ops, c.strokeColor, clip.Outline{ps}.Op())
 }
 

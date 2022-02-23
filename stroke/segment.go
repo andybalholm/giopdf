@@ -7,6 +7,8 @@ import (
 	"math"
 
 	"gioui.org/f32"
+	"gioui.org/op"
+	"gioui.org/op/clip"
 	"golang.org/x/exp/slices"
 )
 
@@ -175,4 +177,20 @@ func reversePath(path []Segment) []Segment {
 		result[len(result)-i-1] = s.reverse()
 	}
 	return result
+}
+
+func ToPathSpec(ops *op.Ops, outline [][]Segment) clip.PathSpec {
+	var path clip.Path
+	path.Begin(ops)
+
+	for _, contour := range outline {
+		path.MoveTo(contour[0].Start)
+		for i, s := range contour {
+			if i > 0 && s.Start != contour[i-1].End {
+				path.LineTo(s.Start)
+			}
+			path.CubeTo(s.CP1, s.CP2, s.End)
+		}
+	}
+	return path.End()
 }
