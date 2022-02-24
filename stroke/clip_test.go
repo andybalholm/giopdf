@@ -30,6 +30,19 @@ func TestStrokedPathBevelFlat(t *testing.T) {
 	})
 }
 
+func BenchmarkStrokedPathBevelFlat(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		ops := new(op.Ops)
+		ops.Reset()
+		s := Stroke(fruit, Options{
+			Width: 2.5,
+			Cap:   FlatCap,
+			Join:  BevelJoin,
+		})
+		paint.FillShape(ops, red, clip.Outline{ToPathSpec(ops, s)}.Op())
+	}
+}
+
 func TestStrokedPathBevelRound(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		s := Stroke(fruit, Options{
@@ -158,6 +171,26 @@ func TestDashedPathFlatCapEllipse(t *testing.T) {
 		r.expect(0, 62, colornames.Red)
 		r.expect(0, 65, colornames.Black)
 	})
+}
+
+func BenchmarkDashedPathVlatCapEllipse(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		ops := new(op.Ops)
+		ops.Reset()
+		dashed := Dash(ellipse, []float32{5, 3}, 0)
+		s := Stroke(dashed, Options{
+			Width:      10,
+			Cap:        FlatCap,
+			Join:       MiterJoin,
+			MiterLimit: float32(math.Inf(+1)),
+		})
+		paint.FillShape(ops, red, clip.Outline{ToPathSpec(ops, s)}.Op())
+
+		s = Stroke(ellipse, Options{
+			Width: 2,
+		})
+		paint.FillShape(ops, black, clip.Outline{ToPathSpec(ops, s)}.Op())
+	}
 }
 
 func TestDashedPathFlatCapZ(t *testing.T) {
