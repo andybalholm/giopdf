@@ -5,8 +5,8 @@ go 1.18
 require (
 	gioui.org v0.0.0-20220131180029-7204632c39d4
 	gioui.org/x v0.0.0-20211230193557-0484e0de5e4d
+	github.com/andybalholm/stroke v0.0.0-20220303015302-9e53fa01d432
 	github.com/benoitkugler/textlayout v0.0.9
-	golang.org/x/exp v0.0.0-20220218155646-ea2fe41b636b
 	golang.org/x/image v0.0.0-20211028202545-6944b10bf410
 )
 

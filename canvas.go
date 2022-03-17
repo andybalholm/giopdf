@@ -8,7 +8,7 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
-	"github.com/andybalholm/giopdf/stroke"
+	"github.com/andybalholm/stroke"
 )
 
 // A Canvas implements the PDF imaging model, drawing to a Gio operations list.
@@ -55,14 +55,14 @@ func (c *Canvas) stroke() {
 				contour = nil
 			}
 		case 'l':
-			contour = append(contour, stroke.LinearSegment(pos, e.End))
+			contour = append(contour, stroke.LinearSegment(stroke.Point(pos), stroke.Point(e.End)))
 			pos = e.End
 		case 'c':
-			contour = append(contour, stroke.Segment{pos, e.CP1, e.CP2, e.End})
+			contour = append(contour, stroke.Segment{stroke.Point(pos), stroke.Point(e.CP1), stroke.Point(e.CP2), stroke.Point(e.End)})
 			pos = e.End
 		case 'h':
 			if pos != lastMove {
-				contour = append(contour, stroke.LinearSegment(pos, lastMove))
+				contour = append(contour, stroke.LinearSegment(stroke.Point(pos), stroke.Point(lastMove)))
 				pos = lastMove
 			}
 		}
@@ -83,8 +83,24 @@ func (c *Canvas) stroke() {
 		MiterLimit: c.miterLimit,
 	})
 
-	ps := stroke.ToPathSpec(c.ops, outline)
+	ps := segmentsToPathSpec(c.ops, outline)
 	paint.FillShape(c.ops, c.strokeColor, clip.Outline{ps}.Op())
+}
+
+func segmentsToPathSpec(ops *op.Ops, outline [][]stroke.Segment) clip.PathSpec {
+	var path clip.Path
+	path.Begin(ops)
+
+	for _, contour := range outline {
+		path.MoveTo(f32.Point(contour[0].Start))
+		for i, s := range contour {
+			if i > 0 && s.Start != contour[i-1].End {
+				path.LineTo(f32.Point(s.Start))
+			}
+			path.CubeTo(f32.Point(s.CP1), f32.Point(s.CP2), f32.Point(s.End))
+		}
+	}
+	return path.End()
 }
 
 func (c *Canvas) finishPath() {
